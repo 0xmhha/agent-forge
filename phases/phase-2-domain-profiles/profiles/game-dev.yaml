@@ -1,0 +1,123 @@
+# =============================================================================
+# 게임 개발 도메인 프로필 (Game Development)
+# =============================================================================
+# 런타임 성능이 최우선. 매 프레임 16.67ms(60fps) 예산 내에서 동작해야 한다.
+# GC 압력 최소화, 메모리 할당 제어, Hot path 최적화에 집중한다.
+# 규제 준수보다는 플레이어 경험과 프레임 안정성이 핵심이다.
+# =============================================================================
+
+metadata:
+  domain: game-dev
+  version: "1.0"
+  description: "게임 개발 도메인 프로필 - 런타임 성능과 프레임 안정성 최우선"
+  author: "agent-forge"
+  last_updated: "2026-03-10"
+
+priority_matrix:
+  safety: 0.3          # 인명 피해 없음, 크래시 복구 가능
+  compliance: 0.1      # 게임 등급 심사 외 규제 거의 없음
+  performance: 0.95    # 프레임 드롭은 곧 사용자 이탈
+  dev_speed: 0.7       # 빠른 이터레이션이 재미 검증의 핵심
+  maintainability: 0.5 # 중요하지만 성능 트레이드오프 허용
+
+convention_overrides:
+  test_strategy: integration_first    # 게임 시스템 간 상호작용 검증 (물리+렌더+AI)
+  review_depth: must_only             # MUST만 차단, 나머지는 빠른 이터레이션
+  documentation_level: minimal        # 핵심 시스템 아키텍처만 문서화
+  code_style: performance_first       # 가독성보다 캐시 친화성과 분기 최소화
+
+domain_knowledge:
+  terminology:
+    - term: "tick"
+      meaning: "게임 로직의 1회 업데이트 사이클 (보통 고정 시간 간격)"
+      constraints: "tick 내 모든 로직은 할당된 시간 예산 내에서 완료해야 함"
+    - term: "frame budget"
+      meaning: "한 프레임 렌더링에 허용된 시간 (60fps = 16.67ms, 30fps = 33.33ms)"
+      constraints: "예산 초과 시 프레임 드롭 발생, hot path에서 엄격히 관리"
+    - term: "hot path"
+      meaning: "매 프레임/틱마다 실행되는 코드 경로 (Update, FixedUpdate, Render)"
+      constraints: "할당, GC, I/O, 가상 호출 최소화 필수"
+    - term: "ECS"
+      meaning: "Entity Component System - 데이터 지향 아키텍처 패턴"
+      constraints: "컴포넌트는 순수 데이터, 시스템은 순수 로직, 상속 대신 합성"
+    - term: "object pool"
+      meaning: "사전 할당된 객체 재사용 풀 - GC 압력 제거"
+      constraints: "풀 크기는 최대 동시 사용량 기반으로 설정, 동적 확장 시 경고"
+    - term: "LOD"
+      meaning: "Level of Detail - 거리/중요도 기반 연산 품질 조절"
+      constraints: "LOD 전환 시 시각적 팝핑 최소화"
+
+  forbidden_patterns:
+    - id: gc_in_hot_loop
+      description: "Hot path(Update/Render 루프)에서 GC를 유발하는 할당 금지 - 프레임 스파이크 원인"
+      severity: MUST
+      alternative: "Object pooling 또는 사전 할당 배열 사용"
+      detection_hint: "Update/Render 함수 내 new 키워드, 문자열 연결, LINQ, 박싱"
+
+    - id: dynamic_allocation_in_update
+      description: "매 프레임 실행되는 코드에서 동적 메모리 할당 금지"
+      severity: MUST
+      alternative: "초기화 시점에 할당하고 재사용, 또는 스택 할당(stackalloc) 사용"
+      detection_hint: "Update/FixedUpdate/LateUpdate 내 List/Dictionary 생성, new object"
+
+    - id: blocking_io_in_render
+      description: "렌더링/게임 루프 스레드에서 블로킹 I/O 금지 - 프레임 정지 유발"
+      severity: MUST
+      alternative: "비동기 로딩 + 로딩 화면, 또는 별도 스레드에서 처리"
+      detection_hint: "메인 스레드에서 File.Read, HTTP 동기 호출, DB 쿼리"
+
+    - id: unbounded_iteration
+      description: "프레임 내에서 상한 없는 반복문 금지 - 최악의 경우 프레임 예산 초과"
+      severity: MUST
+      alternative: "프레임당 처리 개수 제한 (time slicing) 또는 작업 분산"
+      detection_hint: "while(true), 컬렉션 전체 순회가 프레임 예산 고려 없이 사용"
+
+    - id: deep_inheritance_hierarchy
+      description: "3단계 이상의 상속 계층 금지 - 가상 호출 오버헤드 + 코드 추적 어려움"
+      severity: SHOULD
+      alternative: "컴포지션 패턴 또는 ECS 아키텍처 사용"
+      detection_hint: "3단계 이상 extends/상속 체인"
+
+    - id: string_comparison_in_hot_path
+      description: "Hot path에서 문자열 비교 금지 - 해시 비교 대비 수십 배 느림"
+      severity: SHOULD
+      alternative: "enum, int ID, 또는 사전 계산된 해시 사용"
+      detection_hint: "Update 내 string ==, string.Equals, CompareTag 대신 == tag"
+
+    - id: physics_raycast_every_frame
+      description: "매 프레임 대량 레이캐스트 금지 - 물리 연산 병목"
+      severity: SHOULD
+      alternative: "N 프레임마다 실행 + 결과 캐싱, 또는 spatial partitioning 사용"
+      detection_hint: "Update 내 Raycast/RaycastAll 반복 호출"
+
+  required_patterns:
+    - id: object_pooling
+      description: "빈번히 생성/파괴되는 객체는 오브젝트 풀링 필수 - 총알, 이펙트, UI 요소 등"
+      applies_to: "1초에 여러 번 생성/파괴되는 모든 게임 오브젝트"
+      verification: "Pool/ObjectPool 사용 + Instantiate/Destroy 대신 Get/Return 패턴"
+
+    - id: frame_budget_awareness
+      description: "복잡한 연산에 프레임 예산 인식 처리 필수 - 한 프레임에 과도한 연산 방지"
+      applies_to: "AI 탐색, 경로 찾기, 월드 생성 등 무거운 연산"
+      verification: "time slicing, coroutine 분산, 또는 Job System 사용"
+
+    - id: deterministic_simulation
+      description: "게임 시뮬레이션 로직은 결정론적이어야 함 - 리플레이, 넷코드 동기화 필수"
+      applies_to: "게임플레이 로직, 물리 시뮬레이션, 상태 전이"
+      verification: "고정 시간 간격(FixedUpdate) 사용 + 부동소수점 결정론 보장"
+
+    - id: input_buffering
+      description: "플레이어 입력은 버퍼링 처리 필수 - 입력 누락으로 인한 조작감 저하 방지"
+      applies_to: "플레이어 입력 처리 시스템"
+      verification: "입력 큐/버퍼 구현 + 고정 시간 간격에서 소비"
+
+workflow:
+  complexity_thresholds:
+    micro_max_files: 3     # 게임은 작은 변경도 여러 파일에 걸침 (코드+에셋+설정)
+    standard_max_files: 15 # 시스템 하나가 많은 파일에 걸칠 수 있음
+
+  qr_settings:
+    max_iterations: 3          # 빠른 이터레이션 우선, 과도한 리뷰 반복 방지
+    initial_blocking: must_only  # MUST만 차단, 빠르게 플레이테스트 가능하게
+
+  automation_level: aggressive  # 빠른 이터레이션을 위해 자동 결정 최대화

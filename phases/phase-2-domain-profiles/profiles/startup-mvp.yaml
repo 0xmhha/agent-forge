@@ -1,0 +1,117 @@
+# =============================================================================
+# 스타트업 MVP 도메인 프로필 (Startup MVP)
+# =============================================================================
+# 시장 검증 속도가 최우선. "완벽한 코드"보다 "동작하는 제품"이 중요하다.
+# 기술 부채를 의식적으로 수용하되, 크리티컬 장애와 보안 사고는 방지한다.
+# Product-Market Fit 확인 후 리팩토링/재작성을 전제로 한다.
+# =============================================================================
+
+metadata:
+  domain: startup-mvp
+  version: "1.0"
+  description: "스타트업 MVP 도메인 프로필 - 시장 검증 속도 최우선, 의식적 기술 부채 수용"
+  author: "agent-forge"
+  last_updated: "2026-03-10"
+
+priority_matrix:
+  safety: 0.4          # 기본 안전성만 확보, 인명 관련 아님
+  compliance: 0.1      # 초기 단계에서 규제 부담 최소
+  performance: 0.3     # "느려도 동작하면 OK", 최적화는 나중에
+  dev_speed: 0.95      # 가설 검증 속도가 생존을 결정
+  maintainability: 0.3 # PMF 전에는 코드 수명이 짧음, 재작성 각오
+
+convention_overrides:
+  test_strategy: e2e_first            # 핵심 사용자 플로우만 E2E로 검증
+  review_depth: must_only             # 크리티컬 이슈만 차단, 나머지 전부 통과
+  documentation_level: minimal        # API 사용법 + 환경 설정만 문서화
+  code_style: readability_first       # 빠른 온보딩을 위해 단순하고 읽기 쉽게
+
+domain_knowledge:
+  terminology:
+    - term: "MVP"
+      meaning: "Minimum Viable Product - 가설 검증에 필요한 최소한의 기능 집합"
+      constraints: "스코프 크립 방지, 핵심 가설과 무관한 기능 추가 금지"
+    - term: "PMF"
+      meaning: "Product-Market Fit - 시장이 원하는 제품을 만들었는지 확인"
+      constraints: "PMF 달성 전까지 대규모 리팩토링/최적화 자제"
+    - term: "feature flag"
+      meaning: "기능 토글 - 배포와 릴리스를 분리하는 메커니즘"
+      constraints: "실험 기능은 반드시 feature flag로 감싸기"
+    - term: "pivot"
+      meaning: "사업 방향 전환 - 가설이 틀렸을 때 빠르게 방향 변경"
+      constraints: "피봇 가능성을 고려하여 도메인 로직과 인프라를 느슨하게 결합"
+
+  forbidden_patterns:
+    - id: premature_optimization
+      description: "프로파일링 데이터 없는 성능 최적화 금지 - 시간 낭비의 주범"
+      severity: SHOULD
+      alternative: "먼저 동작하게 만들고, 병목이 확인되면 그때 최적화"
+      detection_hint: "프로파일링 근거 없이 캐시, 인덱스, 비정규화 등 적용"
+
+    - id: over_abstraction
+      description: "사용처가 1곳인 추상화 금지 - YAGNI 원칙 위반"
+      severity: SHOULD
+      alternative: "구체적 구현으로 시작, 3회 이상 중복될 때 추상화"
+      detection_hint: "단일 구현체만 있는 인터페이스/추상 클래스"
+
+    - id: yagni_violation
+      description: "현재 요구사항에 없는 기능 구현 금지 - '나중에 필요할 것 같아서' 금지"
+      severity: SHOULD
+      alternative: "현재 스프린트의 사용자 스토리에 명시된 것만 구현"
+      detection_hint: "TODO: future, FIXME: later 주석과 함께 작성된 미사용 코드"
+
+    - id: complex_auth_from_scratch
+      description: "인증/인가 시스템 자체 구현 금지 - 보안 취약점 + 시간 낭비"
+      severity: MUST
+      alternative: "Auth0, Firebase Auth, Supabase Auth 등 검증된 서비스 사용"
+      detection_hint: "JWT 직접 생성, bcrypt 직접 호출, 세션 관리 직접 구현"
+
+    - id: custom_infrastructure
+      description: "MVP 단계에서 커스텀 인프라 구축 금지 - 관리형 서비스 사용"
+      severity: SHOULD
+      alternative: "Vercel, Railway, Supabase 등 관리형 PaaS/BaaS 활용"
+      detection_hint: "Kubernetes 설정, 커스텀 CI/CD 파이프라인, 자체 모니터링 스택"
+
+    - id: no_error_tracking
+      description: "에러 모니터링 없는 배포 금지 - 사용자 문제를 인지하지 못하면 가설 검증 불가"
+      severity: MUST
+      alternative: "Sentry, LogRocket 등 에러 추적 서비스 연동"
+      detection_hint: "프로덕션 배포 설정에 에러 추적 서비스 설정 누락"
+
+    - id: gold_plating
+      description: "핵심 기능 완성 전 UI 미세 조정/애니메이션 작업 금지"
+      severity: SHOULD
+      alternative: "기능 동작 확인 후, 사용자 피드백 기반으로 UX 개선"
+      detection_hint: "핵심 비즈니스 로직 미완성 상태에서 CSS 애니메이션, 마이크로인터랙션 작업"
+
+  required_patterns:
+    - id: error_monitoring
+      description: "프로덕션 환경에 크래시 리포팅/에러 모니터링 필수 - 사용자 문제 즉시 인지"
+      applies_to: "프로덕션 배포되는 모든 애플리케이션"
+      verification: "Sentry, Bugsnag 등 에러 추적 SDK 초기화 코드 존재"
+
+    - id: basic_auth
+      description: "최소한의 인증 체계 필수 - 관리형 서비스 기반"
+      applies_to: "사용자 데이터를 다루는 모든 엔드포인트"
+      verification: "인증 미들웨어 적용 + 미인증 요청 차단"
+
+    - id: env_config
+      description: "환경별 설정 분리 필수 - 하드코딩된 URL, 키 금지"
+      applies_to: "외부 서비스 연동, DB 접속, API 키 등 모든 설정값"
+      verification: "환경 변수 또는 .env 파일 기반 설정 + .env.example 존재"
+
+    - id: health_check
+      description: "헬스체크 엔드포인트 필수 - 서비스 상태 모니터링의 기본"
+      applies_to: "모든 배포 가능한 서비스"
+      verification: "GET /health 또는 유사 엔드포인트 존재 + 외부 모니터링 연동"
+
+workflow:
+  complexity_thresholds:
+    micro_max_files: 5     # MVP에서는 5개 파일까지 Micro로 빠르게 처리
+    standard_max_files: 20 # 대부분의 기능을 Standard로 처리
+
+  qr_settings:
+    max_iterations: 2          # 최소 반복으로 빠르게 머지
+    initial_blocking: must_only  # MUST만 차단, 나머지는 전부 통과
+
+  automation_level: aggressive  # 저위험 결정은 모두 자동, 최대한 빠르게

@@ -115,20 +115,20 @@ LLM으로 병합하면 반복할수록 세부사항이 사라진다 (context col
 ## 작업 항목
 
 ### 3.1 델타 로그
-- [ ] 델타 엔트리 JSON 스키마 확정
-- [ ] 결정론적 병합 규칙 문서화
-- [ ] 병합 규칙의 엣지 케이스 정의 (충돌, 모호함)
-- [ ] 델타 로그 → 컨텍스트 주입 포맷 정의
+- [x] 델타 엔트리 JSON 스키마 확정 → `delta-schema.json`
+- [x] 결정론적 병합 규칙 문서화 → `merge-rules.md`
+- [x] 병합 규칙의 엣지 케이스 정의 (충돌, 모호함) → `merge-rules.md`
+- [x] 델타 로그 → 컨텍스트 주입 포맷 정의 → `context-injection.md`
 
 ### 3.2 롤링 요약
-- [ ] 강제 섹션 목록 확정
-- [ ] 요약 생성 트리거 조건 정의
-- [ ] 요약 품질 검증 방법 (정보 손실 감지)
-- [ ] 최대 요약 크기 (토큰) 정의
+- [x] 강제 섹션 목록 확정 → `rolling-summary-template.md`
+- [x] 요약 생성 트리거 조건 정의 → `rolling-summary-template.md`
+- [x] 요약 품질 검증 방법 (정보 손실 감지) → `rolling-summary-template.md`
+- [x] 최대 요약 크기 (토큰) 정의 → `rolling-summary-template.md`
 
 ### 3.3 변경 감지
-- [ ] 최소 구현 (파일 해시 비교) 설계
-- [ ] 확장 구현 (Merkle Tree) 설계 (Phase 3 이후)
+- [x] 최소 구현 (파일 해시 비교) 설계 → `change-detection.md`
+- [x] 확장 구현 (Merkle Tree) 설계 (Phase 3 이후) → `change-detection.md`
 
 ## 선행 조건
 

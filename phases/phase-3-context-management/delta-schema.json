@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-forge.dev/schemas/delta-entry.json",
+  "title": "Delta Log Entry",
+  "description": "마일스톤 완료 시 생성되는 델타 로그 엔트리 스키마. ACE(Agentic Context Engineering) 패턴에 기반하여 증분 컨텍스트를 구조화한다. 각 엔트리는 하나의 마일스톤에서 발생한 변경, 결정, 교훈을 기록하며, 결정론적 병합 규칙(merge-rules.md)에 따라 누적 컨텍스트에 병합된다.",
+  "type": "object",
+  "required": ["milestone", "timestamp", "files_changed", "decisions"],
+  "additionalProperties": false,
+  "properties": {
+    "milestone": {
+      "type": "string",
+      "pattern": "^M[0-9]+$",
+      "description": "마일스톤 식별자. 'M' 접두사 + 숫자. 예: M1, M12"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "엔트리 생성 시각 (ISO 8601). UTC 기준"
+    },
+    "files_changed": {
+      "type": "array",
+      "description": "이 마일스톤에서 변경된 파일 목록. 변경 감지(change-detection.md)에 의해 자동 생성 가능",
+      "items": {
+        "type": "object",
+        "required": ["path", "action", "summary"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "프로젝트 루트 기준 상대 경로. 예: src/auth/jwt.py"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["created", "modified", "deleted"],
+            "description": "파일에 대한 작업 유형"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "변경 내용 요약. 200자 이내. '무엇을 왜' 형식 권장"
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "description": "이 마일스톤에서 내린 기술적/설계적 결정. 한번 기록된 결정은 절대 삭제되지 않음",
+      "items": {
+        "type": "object",
+        "required": ["decision", "rationale"],
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "결정 내용. 간결하게. 예: 'JWT > 세션 기반 인증'"
+          },
+          "rationale": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "결정 근거. 왜 이 선택을 했는지"
+          },
+          "alternatives_rejected": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "검토했으나 기각된 대안 목록"
+          }
+        }
+      }
+    },
+    "lessons": {
+      "type": "array",
+      "description": "이 마일스톤에서 얻은 교훈. 이후 마일스톤에서 같은 실수를 반복하지 않기 위함",
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "default": []
+    },
+    "unresolved": {
+      "type": "array",
+      "description": "아직 해결되지 않은 이슈. 이후 마일스톤에서 해결되면 자동 제거됨",
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "default": []
+    },
+    "next_steps": {
+      "type": "array",
+      "description": "다음 마일스톤에서 수행해야 할 작업. 완료되면 자동 제거됨",
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "default": []
+    },
+    "context_snapshot": {
+      "type": "object",
+      "description": "마일스톤 완료 시점의 프로젝트 상태 스냅샷. 프로젝트 규모 추적에 사용",
+      "additionalProperties": false,
+      "properties": {
+        "total_files": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "프로젝트 전체 파일 수 (소스 코드만)"
+        },
+        "total_lines": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "프로젝트 전체 라인 수"
+        },
+        "key_modules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "현재 프로젝트의 핵심 모듈/패키지 목록. 예: ['src/auth', 'src/api', 'src/models']"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "milestone": "M3",
+      "timestamp": "2026-03-10T15:30:00Z",
+      "files_changed": [
+        {
+          "path": "src/auth/jwt.py",
+          "action": "created",
+          "summary": "JWT 토큰 발급/검증 모듈 생성. RS256 알고리즘, 만료 시간 1시간"
+        },
+        {
+          "path": "src/middleware/auth.py",
+          "action": "created",
+          "summary": "인증 미들웨어 추가. 보호 라우트에 데코레이터 방식 적용"
+        },
+        {
+          "path": "src/models/user.py",
+          "action": "modified",
+          "summary": "role 필드 추가 (admin/user/viewer). 기본값 'user'"
+        },
+        {
+          "path": "src/config.py",
+          "action": "modified",
+          "summary": "JWT_SECRET, TOKEN_EXPIRY 환경변수 설정 추가"
+        }
+      ],
+      "decisions": [
+        {
+          "decision": "JWT > 세션 기반 인증",
+          "rationale": "무상태 우선 설계. 수평 확장 시 세션 스토어 불필요. API 클라이언트 호환성",
+          "alternatives_rejected": [
+            "세션 + Redis: 추가 인프라 비용",
+            "OAuth2 only: MVP 단계에서 과도한 복잡성"
+          ]
+        },
+        {
+          "decision": "RS256 > HS256",
+          "rationale": "비대칭 키로 서비스 간 토큰 검증 가능. 마이크로서비스 전환 대비",
+          "alternatives_rejected": [
+            "HS256: 단순하지만 키 공유 필요"
+          ]
+        }
+      ],
+      "lessons": [
+        "bcrypt 라이브러리가 M1에서 이미 설치됨 — 추가 의존성 불필요",
+        "PyJWT와 jwt 패키지가 충돌함 — PyJWT만 사용할 것"
+      ],
+      "unresolved": [
+        "토큰 갱신(refresh token) 전략 미확정",
+        "역할 기반 접근 제어(RBAC) 세부 권한 모델 미정의"
+      ],
+      "next_steps": [
+        "토큰 갱신 엔드포인트 구현 (POST /auth/refresh)",
+        "RBAC 권한 매트릭스 설계",
+        "인증 미들웨어 통합 테스트 작성"
+      ],
+      "context_snapshot": {
+        "total_files": 23,
+        "total_lines": 1847,
+        "key_modules": [
+          "src/auth",
+          "src/api",
+          "src/models",
+          "src/middleware"
+        ]
+      }
+    },
+    {
+      "milestone": "M5",
+      "timestamp": "2026-03-12T09:15:00Z",
+      "files_changed": [
+        {
+          "path": "src/api/payments.py",
+          "action": "created",
+          "summary": "결제 API 엔드포인트. Stripe 연동, 웹훅 처리"
+        },
+        {
+          "path": "src/services/stripe_client.py",
+          "action": "created",
+          "summary": "Stripe SDK 래퍼. 멱등성 키 자동 생성, 재시도 로직 포함"
+        },
+        {
+          "path": "tests/test_payments.py",
+          "action": "created",
+          "summary": "결제 플로우 단위 테스트. Mock Stripe 사용"
+        }
+      ],
+      "decisions": [
+        {
+          "decision": "Stripe > 자체 결제 게이트웨이",
+          "rationale": "PCI DSS 컴플라이언스 위임. MVP 출시 속도 우선",
+          "alternatives_rejected": [
+            "자체 구현: PCI 인증 비용 과다",
+            "PayPal: 한국 시장 점유율 낮음"
+          ]
+        }
+      ],
+      "lessons": [
+        "Stripe 웹훅은 반드시 서명 검증 필요 — 빠뜨리면 보안 취약점",
+        "멱등성 키 없이 재시도하면 이중 결제 발생 가능"
+      ],
+      "unresolved": [
+        "환불 정책 및 자동 환불 로직 미구현"
+      ],
+      "next_steps": [
+        "환불 API 구현",
+        "결제 실패 알림 시스템 연동",
+        "Stripe 웹훅 보안 검증 테스트 추가"
+      ],
+      "context_snapshot": {
+        "total_files": 38,
+        "total_lines": 3215,
+        "key_modules": [
+          "src/auth",
+          "src/api",
+          "src/models",
+          "src/middleware",
+          "src/services"
+        ]
+      }
+    }
+  ]
+}
