@@ -128,21 +128,31 @@ MUST 발견:     [?]    [?]     [?]
 정보 손실 건수:   [?] vs [?]
 ```
 
+## 산출물
+
+| 문서 | 내용 |
+|------|------|
+| [metrics-definition.md](metrics-definition.md) | 핵심 메트릭 선정 (Tier 1 필수 5개 + Tier 2 선택 5개), 파생 메트릭, 수집 형식 |
+| [collection-guide.md](collection-guide.md) | 3단계 수집 전략 (수동 → ccusage → JSONL 파서), jq 쿼리 예시 |
+| [analysis-playbook.md](analysis-playbook.md) | 4가지 분석 절차 (워크플로우/QR/도메인/컨텍스트), 판단 기준 |
+| [templates/session-log.json](templates/session-log.json) | 세션 로그 빈 템플릿 |
+| [templates/session-log-schema.json](templates/session-log-schema.json) | 세션 로그 JSON Schema |
+
 ## 작업 항목
 
 ### 4.1 메트릭 확정
-- [ ] 핵심 메트릭 목록 확정 (위 표에서 선택)
-- [ ] 수집 시점과 방법 확정
-- [ ] 저장 형식 확정 (JSON, CSV, 또는 기타)
+- [x] 핵심 메트릭 목록 확정 → `metrics-definition.md`
+- [x] 수집 시점과 방법 확정 → `collection-guide.md`
+- [x] 저장 형식 확정 (JSON) → `templates/session-log-schema.json`
 
 ### 4.2 수집 도구 선택/구현
-- [ ] ccusage 연동 테스트
-- [ ] cc-history JSONL 파서 필요성 판단
-- [ ] 최소 수집 방법 (수동 로그) 템플릿 작성
+- [x] ccusage 연동 방법 문서화 → `collection-guide.md`
+- [x] cc-history JSONL 파서 방법 문서화 → `collection-guide.md`
+- [x] 최소 수집 방법 (수동 로그) 템플릿 작성 → `templates/session-log.json`
 
 ### 4.3 첫 번째 분석
-- [ ] Phase 1 적용 전/후 비교 데이터 수집
-- [ ] 워크플로우별 (Micro/Standard/Full) 비교
+- [ ] Phase 1 적용 전/후 비교 데이터 수집 (세션 5개 축적 필요)
+- [ ] 워크플로우별 (Micro/Standard/Full) 비교 (세션 10개 축적 필요)
 - [ ] 개선 방향 1건 이상 도출
 
 ## 선행 조건

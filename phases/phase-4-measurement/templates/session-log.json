@@ -1,0 +1,21 @@
+{
+  "$schema": "session-log-schema.json",
+  "session_id": "",
+  "date": "",
+  "project": "",
+  "workflow_tier": "",
+  "domain_profile": "",
+  "milestones": 0,
+  "files_changed": 0,
+  "qr_iterations": [],
+  "rework_count": 0,
+  "tokens": {
+    "total": 0,
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_create": 0
+  },
+  "duration_minutes": 0,
+  "notes": ""
+}
