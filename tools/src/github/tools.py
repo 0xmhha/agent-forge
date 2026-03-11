@@ -189,6 +189,44 @@ def _sanitize_error(message: str) -> str:
     return _TOKEN_PATTERN.sub("[REDACTED]", message)
 
 
+def register_actions(server: ToolServer) -> None:
+    """Register M4 environment setup tools (PR review, CI debug)."""
+    _repo_param = {
+        "type": "string",
+        "description": "Repository in 'owner/repo' format",
+    }
+
+    server.register_tool(
+        name="github_setup_pr_review",
+        description="Clone repo and checkout PR branch for code review",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "repo": _repo_param,
+                "pr_number": {"type": "integer", "description": "PR number"},
+                "target_dir": {"type": "string", "description": "Local directory to clone into"},
+            },
+            "required": ["repo", "pr_number", "target_dir"],
+        },
+        handler=_make_stub("github_setup_pr_review"),
+    )
+
+    server.register_tool(
+        name="github_setup_ci_debug",
+        description="Clone repo at failed commit and fetch CI failure logs",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "repo": _repo_param,
+                "run_id": {"type": "integer", "description": "GitHub Actions run ID"},
+                "target_dir": {"type": "string", "description": "Local directory to clone into"},
+            },
+            "required": ["repo", "run_id", "target_dir"],
+        },
+        handler=_make_stub("github_setup_ci_debug"),
+    )
+
+
 def _make_stub(name: str) -> Any:
     """Create a placeholder handler until client is configured."""
 
