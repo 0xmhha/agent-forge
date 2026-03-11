@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "agent-forge-tools": {
+      "command": "python",
+      "args": ["-m", "shared.server"],
+      "cwd": "tools",
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    }
+  }
+}
