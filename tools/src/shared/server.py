@@ -4,6 +4,8 @@ This is the single entry point for all tools. Each tool module
 (gmail, github, etc.) registers its tools here at startup.
 """
 
+import asyncio
+import inspect
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -86,7 +88,7 @@ class ToolServer:
 
         self.register_tool(
             name="task_sync",
-            description="Sync tasks from an external source",
+            description="Sync tasks from an external source (GitHub issues/PRs or Gmail)",
             input_schema={
                 "type": "object",
                 "properties": {
@@ -123,6 +125,24 @@ class ToolServer:
             handler=self._handle_task_update,
         )
 
+    def _register_external_tools(self) -> None:
+        """Register Gmail and GitHub tool modules."""
+        try:
+            from gmail.tools import register as register_gmail
+
+            register_gmail(self)
+        except ImportError:
+            logger.warning("Gmail tools not available")
+
+        try:
+            from github.tools import register as register_github
+            from github.tools import register_actions
+
+            register_github(self)
+            register_actions(self)
+        except ImportError:
+            logger.warning("GitHub tools not available")
+
     def _setup_mcp_handlers(self) -> None:
         """Wire MCP protocol handlers to the server."""
 
@@ -138,6 +158,8 @@ class ToolServer:
 
             try:
                 result = handler(**arguments)
+                if inspect.isawaitable(result):
+                    result = await result
                 return [TextContent(type="text", text=result.model_dump_json())]
             except Exception as exc:
                 logger.exception("Tool %s failed", name)
@@ -151,9 +173,17 @@ class ToolServer:
         return self._task_manager.list_tasks(source=source, status=status, task_type=task_type)
 
     def _handle_task_sync(self, **kwargs: Any) -> ToolResult:
+        source_str = kwargs.get("source", "")
+        repo = kwargs.get("repo", "")
+        if not source_str:
+            return ToolResult(success=False, error="source is required")
+
         return ToolResult(
             success=True,
-            data={"message": f"Sync for {kwargs.get('source')} not yet implemented"},
+            data={
+                "message": f"Use monitors to sync {source_str} tasks",
+                "hint": f"Call github_list_issues or gmail_list_messages with repo={repo}",
+            },
         )
 
     def _handle_task_update(self, **kwargs: Any) -> ToolResult:
@@ -171,6 +201,7 @@ def get_server() -> ToolServer:
     global _server_instance
     if _server_instance is None:
         _server_instance = ToolServer()
+        _server_instance._register_external_tools()
     return _server_instance
 
 
@@ -178,13 +209,13 @@ async def run_server() -> None:
     """Start the MCP server with stdio transport."""
     server = get_server()
     async with stdio_server() as (read_stream, write_stream):
-        await server._server.run(read_stream, write_stream, server._server.create_initialization_options())
+        await server._server.run(
+            read_stream, write_stream, server._server.create_initialization_options()
+        )
 
 
 def main() -> None:
     """CLI entry point."""
-    import asyncio
-
     logging.basicConfig(level=logging.INFO)
     asyncio.run(run_server())
 

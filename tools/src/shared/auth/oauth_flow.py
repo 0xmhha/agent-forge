@@ -97,11 +97,14 @@ class OAuthFlow:
             response.raise_for_status()
             data = response.json()
 
+        import time
+
+        expires_in = data.get("expires_in", 0)
         return StoredToken(
             access_token=data["access_token"],
             refresh_token=data.get("refresh_token", ""),
             token_type=data.get("token_type", "Bearer"),
-            expires_at=data.get("expires_in", 0),
+            expires_at=int(time.time()) + expires_in if expires_in else 0,
             scopes=self._config.scopes,
         )
 
@@ -131,11 +134,14 @@ class OAuthFlow:
             logger.exception("Token refresh failed for %s", self._config.service)
             return None
 
+        import time
+
+        expires_in = data.get("expires_in", 0)
         return StoredToken(
             access_token=data["access_token"],
             refresh_token=data.get("refresh_token", token.refresh_token),
             token_type=data.get("token_type", "Bearer"),
-            expires_at=data.get("expires_in", 0),
+            expires_at=int(time.time()) + expires_in if expires_in else 0,
             scopes=token.scopes,
         )
 

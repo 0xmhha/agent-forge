@@ -62,7 +62,7 @@ class TaskManager:
             metadata=metadata or {},
         )
 
-        upserted = task_store.upsert(task)
+        task_store, upserted = task_store.upsert(task)
         self._store.save(task_store)
 
         return ToolResult(
@@ -91,10 +91,18 @@ class TaskManager:
         return ToolResult(success=False, error=f"Task not found: {task_id}")
 
     def _next_id(self, source: ToolSource) -> str:
-        """Generate the next sequential task ID for a source."""
+        """Generate the next sequential task ID for a source.
+
+        Uses max existing ID to avoid conflicts after task deletion.
+        """
         key = source.value
         if key not in self._counter:
             task_store = self._store.load(source)
-            self._counter[key] = len(task_store.tasks)
+            max_num = 0
+            for task in task_store.tasks:
+                parts = task.id.split("-")
+                if len(parts) == 2 and parts[1].isdigit():
+                    max_num = max(max_num, int(parts[1]))
+            self._counter[key] = max_num
         self._counter[key] += 1
         return f"TASK-{self._counter[key]:03d}"

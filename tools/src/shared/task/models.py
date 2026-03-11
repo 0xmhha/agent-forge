@@ -42,18 +42,15 @@ class TaskStore(BaseModel):
                 return task
         return None
 
-    def upsert(self, task: Task) -> Task:
-        """Insert or update a task based on source_id match."""
+    def upsert(self, task: Task) -> tuple["TaskStore", Task]:
+        """Insert or update a task. Returns new TaskStore (immutable)."""
         existing = self.find_by_source_id(task.source_id)
         if existing:
             idx = self.tasks.index(existing)
             updated = task.model_copy(update={"id": existing.id})
-            new_tasks = list(self.tasks)
-            new_tasks[idx] = updated
-            self.tasks = new_tasks
-            return updated
-        self.tasks = [*self.tasks, task]
-        return task
+            new_tasks = [*self.tasks[:idx], updated, *self.tasks[idx + 1 :]]
+            return self.model_copy(update={"tasks": new_tasks}), updated
+        return self.model_copy(update={"tasks": [*self.tasks, task]}), task
 
     def filter_tasks(
         self,
