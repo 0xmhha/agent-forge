@@ -153,13 +153,13 @@ class TestCIEnvironment:
     @pytest.mark.asyncio
     async def test_setup_fetches_failed_logs(self, ci_env, tmp_dir):
         """setup should fetch CI run info and failed job logs."""
-        ci_env._client.get_ci_status.return_value = {
+        ci_env._client.get_run.return_value = {
             "run_id": 9001,
             "sha": "abc123",
             "conclusion": "failure",
             "url": "https://github.com/org/repo/actions/runs/9001",
             "failed_jobs": [
-                {"name": "test", "conclusion": "failure"},
+                {"id": 5001, "name": "test", "conclusion": "failure"},
             ],
         }
         ci_env._fetch_job_log = AsyncMock(return_value="FAILED: test_auth_timeout\nAssertionError: 300 != 1800")
@@ -178,7 +178,7 @@ class TestCIEnvironment:
     @pytest.mark.asyncio
     async def test_setup_clones_at_failed_sha(self, ci_env, tmp_dir):
         """Should clone the repo at the exact commit that failed."""
-        ci_env._client.get_ci_status.return_value = {
+        ci_env._client.get_run.return_value = {
             "run_id": 9001,
             "sha": "abc123",
             "conclusion": "failure",
@@ -198,7 +198,7 @@ class TestCIEnvironment:
     @pytest.mark.asyncio
     async def test_setup_success_run_returns_no_debug(self, ci_env, tmp_dir):
         """Successful CI run should not set up debug environment."""
-        ci_env._client.get_ci_status.return_value = {
+        ci_env._client.get_run.return_value = {
             "run_id": 9002,
             "sha": "def456",
             "conclusion": "success",
@@ -217,12 +217,12 @@ class TestCIEnvironment:
     @pytest.mark.asyncio
     async def test_setup_clone_failure(self, ci_env, tmp_dir):
         """If git clone fails, result should indicate failure."""
-        ci_env._client.get_ci_status.return_value = {
+        ci_env._client.get_run.return_value = {
             "run_id": 9001,
             "sha": "abc123",
             "conclusion": "failure",
             "url": "https://github.com/org/repo/actions/runs/9001",
-            "failed_jobs": [{"name": "test", "conclusion": "failure"}],
+            "failed_jobs": [{"id": 5001, "name": "test", "conclusion": "failure"}],
         }
         ci_env._fetch_job_log = AsyncMock(return_value="log")
 
@@ -236,12 +236,12 @@ class TestCIEnvironment:
     @pytest.mark.asyncio
     async def test_no_token_in_logs(self, ci_env, tmp_dir):
         """Returned logs must not contain auth tokens."""
-        ci_env._client.get_ci_status.return_value = {
+        ci_env._client.get_run.return_value = {
             "run_id": 9001,
             "sha": "abc123",
             "conclusion": "failure",
             "url": "https://github.com/org/repo/actions/runs/9001",
-            "failed_jobs": [{"name": "test", "conclusion": "failure"}],
+            "failed_jobs": [{"id": 5001, "name": "test", "conclusion": "failure"}],
         }
         ci_env._fetch_job_log = AsyncMock(
             return_value="Error with token ghp_secret123 in request"

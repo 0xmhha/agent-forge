@@ -29,20 +29,20 @@ class CIEnvironment:
         target_dir: str,
     ) -> ToolResult:
         """Clone repo at failed SHA and gather failure context."""
-        ci = await self._client.get_ci_status(repo, str(run_id))
+        run_data = await self._client.get_run(repo, run_id)
 
-        if ci["conclusion"] != "failure":
+        if run_data["conclusion"] != "failure":
             return ToolResult(
                 success=True,
                 data={
-                    "run_id": ci.get("run_id"),
-                    "conclusion": ci["conclusion"],
+                    "run_id": run_data["run_id"],
+                    "conclusion": run_data["conclusion"],
                     "skipped": True,
                     "message": "No failure to debug",
                 },
             )
 
-        sha = ci["sha"]
+        sha = run_data["sha"]
         url = clone_url(repo)
 
         success, output = await run_git("clone", "--depth=50", url, target_dir)
@@ -54,8 +54,8 @@ class CIEnvironment:
             return ToolResult(success=False, error=f"Checkout failed: {output}")
 
         failed_jobs = []
-        for job in ci.get("failed_jobs", []):
-            log = await self._fetch_job_log(repo, run_id, job["name"])
+        for job in run_data.get("failed_jobs", []):
+            log = await self._fetch_job_log(repo, job["id"])
             failed_jobs.append({
                 "name": job["name"],
                 "conclusion": job["conclusion"],
@@ -65,26 +65,26 @@ class CIEnvironment:
         return ToolResult(
             success=True,
             data={
-                "run_id": ci["run_id"],
+                "run_id": run_data["run_id"],
                 "sha": sha,
                 "conclusion": "failure",
-                "url": ci.get("url", ""),
+                "url": run_data.get("url", ""),
                 "target_dir": target_dir,
                 "failed_jobs": failed_jobs,
             },
         )
 
-    async def _fetch_job_log(self, repo: str, run_id: int, job_name: str) -> str:
-        """Fetch log for a specific failed job. Override in tests."""
+    async def _fetch_job_log(self, repo: str, job_id: int) -> str:
+        """Fetch log for a specific failed job by job ID.
+
+        GitHub Actions logs endpoint returns plain text per job,
+        not a ZIP archive, when requesting a single job's log.
+        """
         try:
-            log = await self._client._request(
-                "GET",
-                f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/logs",
-            )
-            return str(log)
+            return await self._client.get_job_log(repo, job_id)
         except Exception:
-            logger.exception("Failed to fetch log for job %s", job_name)
-            return f"Log unavailable for job: {job_name}"
+            logger.exception("Failed to fetch log for job %d", job_id)
+            return f"Log unavailable for job: {job_id}"
 
 
 def _sanitize(text: str) -> str:

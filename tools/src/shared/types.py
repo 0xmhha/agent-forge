@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 
 class ToolSource(StrEnum):
@@ -37,7 +37,7 @@ class ToolResult(BaseModel):
     """Standard response from any MCP tool — never contains auth tokens."""
 
     success: bool
-    data: dict[str, Any] = {}
+    data: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
 
 
@@ -55,10 +55,10 @@ class AuthConfig(BaseModel):
 
     service: ToolSource
     client_id: str = ""
-    client_secret: str = ""
+    client_secret: SecretStr = SecretStr("")
     token_path: str = ""
     scopes: list[str] = Field(default_factory=list)
-    api_key: str = ""
+    api_key: SecretStr = SecretStr("")
 
 
 class ServiceHealth(BaseModel):

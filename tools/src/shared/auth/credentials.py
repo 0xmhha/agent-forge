@@ -2,6 +2,8 @@
 
 import os
 
+from pydantic import SecretStr
+
 from shared.types import AuthConfig, ToolSource
 
 
@@ -10,7 +12,7 @@ def load_gmail_config() -> AuthConfig:
     return AuthConfig(
         service=ToolSource.GMAIL,
         client_id=os.environ.get("GMAIL_CLIENT_ID", ""),
-        client_secret=os.environ.get("GMAIL_CLIENT_SECRET", ""),
+        client_secret=SecretStr(os.environ.get("GMAIL_CLIENT_SECRET", "")),
         scopes=["https://www.googleapis.com/auth/gmail.readonly"],
     )
 
@@ -21,12 +23,11 @@ def load_github_config() -> AuthConfig:
     Supports both OAuth app and personal access token.
     PAT is simpler and sufficient for read-only monitoring.
     """
-    api_key = os.environ.get("GITHUB_TOKEN", "")
     return AuthConfig(
         service=ToolSource.GITHUB,
         client_id=os.environ.get("GITHUB_CLIENT_ID", ""),
-        client_secret=os.environ.get("GITHUB_CLIENT_SECRET", ""),
-        api_key=api_key,
+        client_secret=SecretStr(os.environ.get("GITHUB_CLIENT_SECRET", "")),
+        api_key=SecretStr(os.environ.get("GITHUB_TOKEN", "")),
         scopes=["repo", "read:org"],
     )
 

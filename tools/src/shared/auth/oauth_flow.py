@@ -2,9 +2,10 @@
 
 import asyncio
 import logging
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 
@@ -63,7 +64,7 @@ class OAuthFlow:
             "prompt": "consent",
         }
 
-        full_auth_url = f"{auth_url}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
+        full_auth_url = f"{auth_url}?{urlencode(params)}"
         logger.info("Open this URL to authorize: %s", full_auth_url)
 
         code = await self._wait_for_callback(callback_port)
@@ -91,13 +92,11 @@ class OAuthFlow:
                     "code": code,
                     "redirect_uri": redirect_uri,
                     "client_id": self._config.client_id,
-                    "client_secret": self._config.client_secret,
+                    "client_secret": self._config.client_secret.get_secret_value(),
                 },
             )
             response.raise_for_status()
             data = response.json()
-
-        import time
 
         expires_in = data.get("expires_in", 0)
         return StoredToken(
@@ -125,7 +124,7 @@ class OAuthFlow:
                         "grant_type": "refresh_token",
                         "refresh_token": token.refresh_token,
                         "client_id": self._config.client_id,
-                        "client_secret": self._config.client_secret,
+                        "client_secret": self._config.client_secret.get_secret_value(),
                     },
                 )
                 response.raise_for_status()
@@ -133,8 +132,6 @@ class OAuthFlow:
         except httpx.HTTPError:
             logger.exception("Token refresh failed for %s", self._config.service)
             return None
-
-        import time
 
         expires_in = data.get("expires_in", 0)
         return StoredToken(
@@ -155,7 +152,8 @@ class OAuthFlow:
 
     async def _wait_for_callback(self, port: int) -> str:
         """Start a temporary HTTP server and wait for the OAuth callback."""
-        code_future: asyncio.Future[str] = asyncio.get_event_loop().create_future()
+        loop = asyncio.get_running_loop()
+        code_future: asyncio.Future[str] = loop.create_future()
 
         class CallbackHandler(BaseHTTPRequestHandler):
             def do_GET(self) -> None:
@@ -166,9 +164,7 @@ class OAuthFlow:
                     self.send_header("Content-Type", "text/html")
                     self.end_headers()
                     self.wfile.write(b"Authorization complete. You can close this tab.")
-                    asyncio.get_event_loop().call_soon_threadsafe(
-                        code_future.set_result, auth_code
-                    )
+                    loop.call_soon_threadsafe(code_future.set_result, auth_code)
                 else:
                     self.send_response(400)
                     self.end_headers()
@@ -178,7 +174,13 @@ class OAuthFlow:
                 pass
 
         server = HTTPServer(("localhost", port), CallbackHandler)
-        thread = Thread(target=server.handle_request, daemon=True)
+
+        def _serve_until_done() -> None:
+            """Serve requests until the auth code is received."""
+            while not code_future.done():
+                server.handle_request()
+
+        thread = Thread(target=_serve_until_done, daemon=True)
         thread.start()
 
         code = await code_future
@@ -190,6 +192,4 @@ class OAuthFlow:
         """Check if token has expired (with 5-minute buffer)."""
         if token.expires_at <= 0:
             return False
-        import time
-
         return time.time() > (token.expires_at - 300)

@@ -54,6 +54,47 @@ class GitHubClient:
         result["files"] = [_extract_file(f) for f in files]
         return result
 
+    async def get_run(self, repo: str, run_id: int) -> dict[str, Any]:
+        """Get a specific workflow run by ID, including failed jobs."""
+        run = await self._request(
+            "GET", f"{_GITHUB_API}/repos/{repo}/actions/runs/{run_id}"
+        )
+
+        failed_jobs: list[dict[str, Any]] = []
+        if run.get("conclusion") == "failure":
+            jobs_data = await self._request(
+                "GET",
+                f"{_GITHUB_API}/repos/{repo}/actions/runs/{run_id}/jobs",
+            )
+            failed_jobs = [
+                {"id": job["id"], "name": job["name"], "conclusion": job["conclusion"]}
+                for job in jobs_data.get("jobs", [])
+                if job.get("conclusion") == "failure"
+            ]
+
+        return {
+            "run_id": run["id"],
+            "sha": run.get("head_sha", ""),
+            "conclusion": run.get("conclusion", "pending"),
+            "url": run.get("html_url", ""),
+            "failed_jobs": failed_jobs,
+        }
+
+    async def get_job_log(self, repo: str, job_id: int) -> str:
+        """Fetch plain-text log for a single job."""
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{_GITHUB_API}/repos/{repo}/actions/jobs/{job_id}/logs",
+                headers={
+                    "Authorization": self._auth_header,
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+                follow_redirects=True,
+            )
+            response.raise_for_status()
+            return response.text
+
     async def get_ci_status(self, repo: str, ref: str) -> dict[str, Any]:
         """Get CI status for a commit ref (branch or SHA)."""
         runs_data = await self._request(

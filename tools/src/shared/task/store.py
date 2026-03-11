@@ -15,7 +15,8 @@ class FileTaskStore:
     """
 
     def __init__(self, store_dir: str | Path | None = None) -> None:
-        self._store_dir = Path(store_dir) if store_dir else Path("data/tasks")
+        default_dir = Path.home() / ".agent-forge" / "tasks"
+        self._store_dir = Path(store_dir) if store_dir else default_dir
         self._store_dir.mkdir(parents=True, exist_ok=True)
 
     def load(self, source: ToolSource) -> TaskStore:
