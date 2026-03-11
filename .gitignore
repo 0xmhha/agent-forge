@@ -41,11 +41,16 @@ logs/
 *.pem
 credentials.json
 secrets.yaml
+*.token
+
+# Tool platform data
+data/tasks/
 
 # Build artifacts
 *.o
 *.so
 *.dylib
+*.egg-info/
 
 # Temp
 tmp/
