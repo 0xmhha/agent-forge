@@ -1,0 +1,58 @@
+{
+  "milestone": "M0",
+  "timestamp": "2026-03-12T00:00:00Z",
+  "files_changed": [
+    {"path": "src/shared/types.py", "action": "created", "summary": "Core types: ToolSource, TaskStatus, TaskPriority, ToolResult, AuthConfig with SecretStr"},
+    {"path": "src/shared/server.py", "action": "created", "summary": "MCP server core with tool registration, async handler support, task tool endpoints"},
+    {"path": "src/shared/auth/token_store.py", "action": "created", "summary": "Fernet-encrypted token storage with auto-generated key file"},
+    {"path": "src/shared/auth/oauth_flow.py", "action": "created", "summary": "OAuth 2.0 authorization code flow with local callback server"},
+    {"path": "src/shared/auth/credentials.py", "action": "created", "summary": "Environment-variable-based auth config loader for Gmail and GitHub"},
+    {"path": "src/shared/task/models.py", "action": "created", "summary": "Pydantic Task/TaskStore models with immutable upsert"},
+    {"path": "src/shared/task/store.py", "action": "created", "summary": "File-based JSON task persistence per source"},
+    {"path": "src/shared/task/manager.py", "action": "created", "summary": "Task CRUD operations with sequential ID generation"},
+    {"path": "src/gmail/client.py", "action": "created", "summary": "Gmail API client with message listing, reading, and search"},
+    {"path": "src/gmail/tools.py", "action": "created", "summary": "MCP tool registration for Gmail (3 tools, stub handlers)"},
+    {"path": "src/github/client.py", "action": "created", "summary": "GitHub API client with issues, PRs, CI status, run detail, job logs"},
+    {"path": "src/github/tools.py", "action": "created", "summary": "MCP tool registration for GitHub (5 monitoring + 2 action tools, stub handlers)"},
+    {"path": "src/github/monitors/issue_monitor.py", "action": "created", "summary": "Issue-to-task sync with priority label mapping"},
+    {"path": "src/github/monitors/pr_monitor.py", "action": "created", "summary": "PR-to-task sync, skips draft PRs"},
+    {"path": "src/github/monitors/ci_monitor.py", "action": "created", "summary": "CI failure-to-task sync with failed job names"},
+    {"path": "src/github/actions/git_utils.py", "action": "created", "summary": "Safe git subprocess execution (no shell, no token in URL)"},
+    {"path": "src/github/actions/pr_environment.py", "action": "created", "summary": "PR review environment: clone, checkout, return changed files"},
+    {"path": "src/github/actions/ci_environment.py", "action": "created", "summary": "CI debug environment: clone at failed SHA, fetch per-job logs"},
+    {"path": "src/_template/tools.py", "action": "created", "summary": "Template for new tool module registration"},
+    {"path": "src/_template/client.py", "action": "created", "summary": "Template for new API client"}
+  ],
+  "decisions": [
+    {"decision": "Python + Pydantic > TypeScript + Node.js", "rationale": "Python API client ecosystem more mature, Pydantic provides runtime validation + JSON Schema generation", "alternatives_rejected": ["TypeScript: less mature API clients for Google/GitHub"]},
+    {"decision": "Single MCP server > multiple servers", "rationale": "Simpler management, tools share task store and auth infrastructure", "alternatives_rejected": ["Separate servers per service: management complexity"]},
+    {"decision": "Fernet (AES-128-CBC) for token encryption", "rationale": "Standard symmetric encryption, key from env var or auto-generated file", "alternatives_rejected": ["OS keyring: portability issues", "Plain text: security risk"]},
+    {"decision": "File-based JSON task store > database", "rationale": "Git-trackable, human-readable, Pydantic model compatible", "alternatives_rejected": ["SQLite: overkill for task metadata"]},
+    {"decision": "Immutable Pydantic models", "rationale": "model_copy(update={}) prevents mutation bugs, returns new objects"},
+    {"decision": "src-layout package structure", "rationale": "Avoids setuptools flat-layout discovery errors with multiple packages"}
+  ],
+  "lessons": [
+    "Tool handlers registered as stubs — actual client injection was deferred and never completed (C1)",
+    "Token sanitization patterns were duplicated across 4 files with inconsistent coverage",
+    "expires_in vs expires_at confusion caused token always-expired bug — unit tests would have caught this",
+    "TDD was applied for M2-M5 but without the Phase 1 QR gate, design issues accumulated"
+  ],
+  "unresolved": [
+    "C1: Gmail/GitHub handlers are stubs — always raise NotImplementedError",
+    "C2: Token patterns miss github_pat_, ghs_, ghr_, gha_ prefixes",
+    "M1: No httpx connection pooling — new client per request",
+    "M2+M3: OAuth callback has no timeout and ignores error parameter",
+    "m9: Token sanitization patterns duplicated across 4 files",
+    "m10: No direct unit tests for TokenStore, OAuthFlow, FileTaskStore"
+  ],
+  "next_steps": [
+    "M6: Wire handlers to actual clients, consolidate sanitization, add connection pooling",
+    "Apply QR gate after M6 completion",
+    "Record Phase 4 session metrics"
+  ],
+  "context_snapshot": {
+    "total_files": 20,
+    "total_lines": 2004,
+    "key_modules": ["src/shared", "src/gmail", "src/github", "src/github/monitors", "src/github/actions"]
+  }
+}

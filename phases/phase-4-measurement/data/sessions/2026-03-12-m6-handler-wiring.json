@@ -1,0 +1,20 @@
+{
+  "session_id": "2026-03-12-m6-handler-wiring",
+  "date": "2026-03-12",
+  "project": "mcp-tools",
+  "workflow_tier": "standard",
+  "domain_profile": "mcp-tools",
+  "milestones": 1,
+  "files_changed": 11,
+  "qr_iterations": [1],
+  "rework_count": 2,
+  "tokens": {
+    "total": 0,
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_create": 0
+  },
+  "duration_minutes": 0,
+  "notes": "M6 session spanning 2 context windows (compaction occurred). QR gate iter 1: PASS_WITH_CONCERNS (2 SHOULD). Both SHOULD items fixed in-session. Rework: test_gmail_tools.py and test_github_tools.py modified twice (first for import rename, then for error-test pattern change to _make_handler). Tokens TBD — fill after session via ccusage."
+}

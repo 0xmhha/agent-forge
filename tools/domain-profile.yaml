@@ -1,0 +1,74 @@
+# =============================================================================
+# MCP Tools Platform Domain Profile
+# =============================================================================
+# LLM에 인증 토큰을 노출하지 않는 보안 도구 플랫폼.
+# 토큰 격리가 핵심 불변 조건이며, 보안과 안정성이 개발 속도보다 우선한다.
+# =============================================================================
+
+metadata:
+  domain: mcp-tools
+  version: "1.0"
+  description: "MCP 기반 보안 도구 플랫폼 - 토큰 격리와 안정성 최우선"
+  author: "agent-forge"
+  last_updated: "2026-03-12"
+
+priority_matrix:
+  safety: 0.7            # 토큰 유출은 계정 탈취로 이어질 수 있음
+  compliance: 0.3        # 규제 요구사항 없음 (개인/학습 프로젝트)
+  performance: 0.4       # API 호출 성능보다 정확성이 우선
+  dev_speed: 0.6         # 학습 목적이므로 합리적 속도 유지
+  maintainability: 0.8   # 장기 확장 가능한 구조 (새 도구 추가 용이)
+
+convention_overrides:
+  test_strategy: integration_first    # MCP 도구의 실제 동작 흐름 검증이 핵심
+  review_depth: must_should           # MUST + SHOULD 수준, 과도한 리뷰 방지
+  documentation_level: standard       # 공개 인터페이스 + 아키텍처 결정 기록
+  code_style: readability_first       # 명확한 코드 구조 우선
+
+domain_knowledge:
+  terminology:
+    - term: "token isolation"
+      meaning: "LLM이 인증 토큰을 절대 볼 수 없는 아키텍처 원칙"
+      constraints: "ToolResult, MCP 응답, 에러 메시지에 토큰이 포함되면 안됨"
+    - term: "MCP (Model Context Protocol)"
+      meaning: "LLM과 도구 서버 간 통신 프로토콜 (stdio transport)"
+    - term: "sanitization"
+      meaning: "응답/에러에서 토큰 패턴을 정규식으로 제거하는 방어 계층"
+
+  forbidden_patterns:
+    - id: token_in_response
+      description: "MCP 응답(ToolResult)에 인증 토큰이 포함됨"
+      severity: MUST
+      alternative: "응답 생성 전 sanitize() 함수로 토큰 패턴 제거"
+      detection_hint: "ghp_, gho_, github_pat_, ghs_, ya29., Bearer 패턴"
+    - id: token_in_error_message
+      description: "에러 메시지에 토큰이 노출됨"
+      severity: MUST
+      alternative: "에러 핸들러에서 sanitize() 적용"
+    - id: mutable_shared_state
+      description: "Pydantic 모델이나 공유 상태를 직접 변이"
+      severity: SHOULD
+      alternative: "model_copy(update={...})로 새 객체 생성"
+    - id: blocking_in_async
+      description: "async 함수에서 동기 I/O 호출"
+      severity: SHOULD
+      alternative: "asyncio 호환 라이브러리 사용 또는 run_in_executor"
+
+  required_patterns:
+    - id: token_sanitization
+      description: "외부 API 응답을 LLM에 전달하기 전 토큰 제거"
+      applies_to: "모든 MCP 도구 핸들러의 반환값"
+      verification: "반환 직전에 sanitize() 호출 확인"
+    - id: error_handling
+      description: "모든 외부 API 호출에 에러 핸들링"
+      applies_to: "httpx 요청, subprocess 호출"
+      verification: "try/except 블록 존재 확인"
+
+workflow:
+  complexity_thresholds:
+    micro_max_files: 2
+    standard_max_files: 10
+  qr_settings:
+    max_iterations: 3
+    initial_blocking: must_should
+  automation_level: moderate

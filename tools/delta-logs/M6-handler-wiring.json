@@ -1,0 +1,59 @@
+{
+  "milestone": "M6",
+  "timestamp": "2026-03-12T15:00:00Z",
+  "files_changed": [
+    {"path": "src/shared/sanitize.py", "action": "created", "summary": "Unified token sanitization module — single regex covering 9 token patterns, replaces 4 duplicated patterns"},
+    {"path": "src/gmail/tools.py", "action": "modified", "summary": "Wired stub handlers to GmailClient via _create_client() + _make_handler() pattern with error sanitization"},
+    {"path": "src/github/tools.py", "action": "modified", "summary": "Wired stub handlers to GitHubClient, added _make_action_handler with try/except + sanitize"},
+    {"path": "src/gmail/client.py", "action": "modified", "summary": "Connection pooling — persistent httpx.AsyncClient stored as instance variable"},
+    {"path": "src/github/client.py", "action": "modified", "summary": "Connection pooling — persistent httpx.AsyncClient with follow_redirects=True"},
+    {"path": "src/shared/auth/oauth_flow.py", "action": "modified", "summary": "Added timeout param (300s), error parameter handling, asyncio.wait_for, server_close cleanup"},
+    {"path": "src/github/actions/ci_environment.py", "action": "modified", "summary": "Replaced local _TOKEN_PATTERN with shared.sanitize import"},
+    {"path": "src/github/actions/git_utils.py", "action": "modified", "summary": "Replaced local _TOKEN_PATTERN with shared.sanitize import"},
+    {"path": "src/shared/server.py", "action": "modified", "summary": "Added sanitize() to final error handler — last defense against token leaks in unhandled exceptions"},
+    {"path": "tests/test_gmail_tools.py", "action": "modified", "summary": "Updated imports to private handler names, error tests now go through _make_handler"},
+    {"path": "tests/test_github_tools.py", "action": "modified", "summary": "Updated imports to private handler names, error tests now go through _make_handler"}
+  ],
+  "decisions": [
+    {
+      "decision": "Handler wrapping pattern (_make_handler) > inline error handling",
+      "rationale": "Client injection + None check + try/except + sanitize in one wrapper — DRY, consistent error boundary",
+      "alternatives_rejected": ["Per-handler try/except: duplication across 8 handlers"]
+    },
+    {
+      "decision": "Private handlers (_handle_*) > public handlers",
+      "rationale": "Handlers are internal implementation; only register() and _make_handler are the public contract",
+      "alternatives_rejected": ["Public handlers: test convenience, but exposes internal interface"]
+    },
+    {
+      "decision": "Shared sanitize module > per-file regex patterns",
+      "rationale": "Single source of truth prevents pattern drift — adding a new token type updates all callers",
+      "alternatives_rejected": ["Per-file patterns: faster initial write, but 4 files already drifted"]
+    },
+    {
+      "decision": "Server.py as last-defense sanitizer",
+      "rationale": "Even if a handler forgets to sanitize, the MCP server catches and sanitizes all unhandled exceptions"
+    }
+  ],
+  "lessons": [
+    "QR gate caught _make_action_handler missing error handling — identical pattern to _make_handler but without try/except. Defense-in-depth requires ALL error paths, not just the obvious ones",
+    "Renaming public functions to private breaks downstream tests — should have updated tests in same commit as rename",
+    "Error handling tests must exercise the actual wrapper (_make_handler), not raw handlers — testing raw handlers misses the sanitization behavior",
+    "Phase 1 Standard tier QR (1 iteration, MUST+SHOULD) was sufficient — found 2 SHOULD items, both fixable in-session"
+  ],
+  "unresolved": [
+    "No direct unit tests for shared/sanitize.py — core security module needs its own test suite",
+    "httpx.AsyncClient lifecycle: clients are created at import time but never explicitly closed (aclose)",
+    "No token refresh flow integration: _create_client loads token once, doesn't handle mid-session expiry"
+  ],
+  "next_steps": [
+    "Add test_sanitize.py with coverage for all 9 token patterns",
+    "Add AsyncClient.aclose() cleanup in client classes or context manager pattern",
+    "Consider token refresh integration in _create_client or _make_handler"
+  ],
+  "context_snapshot": {
+    "total_files": 29,
+    "total_lines": 2065,
+    "key_modules": ["src/shared", "src/shared/auth", "src/gmail", "src/github", "src/github/monitors", "src/github/actions"]
+  }
+}
