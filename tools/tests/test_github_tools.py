@@ -49,7 +49,7 @@ class TestGitHubToolHandlers:
 
     @pytest.mark.asyncio
     async def test_handle_list_issues(self):
-        from github.tools import handle_list_issues
+        from github.tools import _handle_list_issues
 
         mock_client = AsyncMock()
         mock_client.list_issues.return_value = [
@@ -58,7 +58,7 @@ class TestGitHubToolHandlers:
              "created_at": "2026-03-11"},
         ]
 
-        result = await handle_list_issues(
+        result = await _handle_list_issues(
             client=mock_client, repo="org/repo", state="open", labels=""
         )
 
@@ -68,7 +68,7 @@ class TestGitHubToolHandlers:
 
     @pytest.mark.asyncio
     async def test_handle_get_issue(self):
-        from github.tools import handle_get_issue
+        from github.tools import _handle_get_issue
 
         mock_client = AsyncMock()
         mock_client.get_issue.return_value = {
@@ -78,7 +78,7 @@ class TestGitHubToolHandlers:
             "comment_count": 3,
         }
 
-        result = await handle_get_issue(
+        result = await _handle_get_issue(
             client=mock_client, repo="org/repo", issue_number=42
         )
 
@@ -87,7 +87,7 @@ class TestGitHubToolHandlers:
 
     @pytest.mark.asyncio
     async def test_handle_list_prs(self):
-        from github.tools import handle_list_prs
+        from github.tools import _handle_list_prs
 
         mock_client = AsyncMock()
         mock_client.list_prs.return_value = [
@@ -97,7 +97,7 @@ class TestGitHubToolHandlers:
              "created_at": "2026-03-11"},
         ]
 
-        result = await handle_list_prs(
+        result = await _handle_list_prs(
             client=mock_client, repo="org/repo", state="open"
         )
 
@@ -106,7 +106,7 @@ class TestGitHubToolHandlers:
 
     @pytest.mark.asyncio
     async def test_handle_get_pr(self):
-        from github.tools import handle_get_pr
+        from github.tools import _handle_get_pr
 
         mock_client = AsyncMock()
         mock_client.get_pr.return_value = {
@@ -116,7 +116,7 @@ class TestGitHubToolHandlers:
                        "additions": 10, "deletions": 2}],
         }
 
-        result = await handle_get_pr(
+        result = await _handle_get_pr(
             client=mock_client, repo="org/repo", pr_number=100
         )
 
@@ -125,7 +125,7 @@ class TestGitHubToolHandlers:
 
     @pytest.mark.asyncio
     async def test_handle_get_ci_status(self):
-        from github.tools import handle_get_ci_status
+        from github.tools import _handle_get_ci_status
 
         mock_client = AsyncMock()
         mock_client.get_ci_status.return_value = {
@@ -134,7 +134,7 @@ class TestGitHubToolHandlers:
             "failed_jobs": [{"name": "test", "conclusion": "failure"}],
         }
 
-        result = await handle_get_ci_status(
+        result = await _handle_get_ci_status(
             client=mock_client, repo="org/repo", ref="abc"
         )
 
@@ -143,14 +143,13 @@ class TestGitHubToolHandlers:
 
     @pytest.mark.asyncio
     async def test_handler_error_returns_failure(self):
-        from github.tools import handle_list_issues
+        from github.tools import _handle_list_issues, _make_handler
 
         mock_client = AsyncMock()
         mock_client.list_issues.side_effect = Exception("rate limit exceeded")
 
-        result = await handle_list_issues(
-            client=mock_client, repo="org/repo", state="", labels=""
-        )
+        wrapped = _make_handler(mock_client, _handle_list_issues)
+        result = await wrapped(repo="org/repo", state="", labels="")
 
         assert result.success is False
         assert "rate limit" in result.error.lower()
@@ -158,15 +157,14 @@ class TestGitHubToolHandlers:
     @pytest.mark.asyncio
     async def test_no_token_in_error(self):
         """Error messages must not leak tokens."""
-        from github.tools import handle_list_issues
+        from github.tools import _handle_list_issues, _make_handler
 
         mock_client = AsyncMock()
         mock_client.list_issues.side_effect = Exception(
             "Auth failed for ghp_secrettoken123"
         )
 
-        result = await handle_list_issues(
-            client=mock_client, repo="org/repo", state="", labels=""
-        )
+        wrapped = _make_handler(mock_client, _handle_list_issues)
+        result = await wrapped(repo="org/repo", state="", labels="")
 
         assert "ghp_" not in result.error

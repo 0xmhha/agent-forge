@@ -57,14 +57,14 @@ class TestGmailToolHandlers:
     @pytest.mark.asyncio
     async def test_handle_list_messages(self):
         """gmail_list_messages handler should return message list."""
-        from gmail.tools import handle_list_messages
+        from gmail.tools import _handle_list_messages
 
         mock_client = AsyncMock()
         mock_client.list_messages.return_value = [
             {"id": "msg-001", "subject": "Hello", "sender": "a@b.com", "date": "2026-03-11"},
         ]
 
-        result = await handle_list_messages(
+        result = await _handle_list_messages(
             client=mock_client, max_results=10, query=""
         )
 
@@ -76,7 +76,7 @@ class TestGmailToolHandlers:
     @pytest.mark.asyncio
     async def test_handle_read_message(self):
         """gmail_read_message handler should return message detail."""
-        from gmail.tools import handle_read_message
+        from gmail.tools import _handle_read_message
 
         mock_client = AsyncMock()
         mock_client.read_message.return_value = {
@@ -86,7 +86,7 @@ class TestGmailToolHandlers:
             "body": "Message body here",
         }
 
-        result = await handle_read_message(client=mock_client, message_id="msg-001")
+        result = await _handle_read_message(client=mock_client, message_id="msg-001")
 
         assert result.success is True
         assert result.data["message"]["body"] == "Message body here"
@@ -94,14 +94,14 @@ class TestGmailToolHandlers:
     @pytest.mark.asyncio
     async def test_handle_search(self):
         """gmail_search handler should return search results."""
-        from gmail.tools import handle_search
+        from gmail.tools import _handle_search
 
         mock_client = AsyncMock()
         mock_client.search.return_value = [
             {"id": "msg-001", "subject": "Meeting", "sender": "a@b.com", "date": "2026-03-11"},
         ]
 
-        result = await handle_search(client=mock_client, query="subject:meeting")
+        result = await _handle_search(client=mock_client, query="subject:meeting")
 
         assert result.success is True
         assert result.data["count"] == 1
@@ -109,12 +109,13 @@ class TestGmailToolHandlers:
     @pytest.mark.asyncio
     async def test_handler_error_returns_failure(self):
         """Handlers should catch exceptions and return ToolResult with error."""
-        from gmail.tools import handle_list_messages
+        from gmail.tools import _handle_list_messages, _make_handler
 
         mock_client = AsyncMock()
         mock_client.list_messages.side_effect = Exception("API quota exceeded")
 
-        result = await handle_list_messages(client=mock_client, max_results=10, query="")
+        wrapped = _make_handler(mock_client, _handle_list_messages)
+        result = await wrapped(max_results=10, query="")
 
         assert result.success is False
         assert "quota" in result.error.lower()
@@ -122,14 +123,15 @@ class TestGmailToolHandlers:
     @pytest.mark.asyncio
     async def test_no_token_leak_in_error(self):
         """Even error messages must not contain token information."""
-        from gmail.tools import handle_list_messages
+        from gmail.tools import _handle_list_messages, _make_handler
 
         mock_client = AsyncMock()
         mock_client.list_messages.side_effect = Exception(
             "Request failed with token ya29.secret123"
         )
 
-        result = await handle_list_messages(client=mock_client, max_results=10, query="")
+        wrapped = _make_handler(mock_client, _handle_list_messages)
+        result = await wrapped(max_results=10, query="")
 
         assert result.success is False
         assert "ya29." not in result.error

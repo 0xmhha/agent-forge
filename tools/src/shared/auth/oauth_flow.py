@@ -150,8 +150,12 @@ class OAuthFlow:
         }
         return urls.get(self._config.service)
 
-    async def _wait_for_callback(self, port: int) -> str:
-        """Start a temporary HTTP server and wait for the OAuth callback."""
+    async def _wait_for_callback(self, port: int, timeout: float = 300) -> str:
+        """Start a temporary HTTP server and wait for the OAuth callback.
+
+        Times out after 300 seconds by default. Handles both successful
+        authorization and user denial (error parameter).
+        """
         loop = asyncio.get_running_loop()
         code_future: asyncio.Future[str] = loop.create_future()
 
@@ -159,12 +163,24 @@ class OAuthFlow:
             def do_GET(self) -> None:
                 query = parse_qs(urlparse(self.path).query)
                 auth_code = query.get("code", [None])[0]
+                error = query.get("error", [None])[0]
+
                 if auth_code:
                     self.send_response(200)
                     self.send_header("Content-Type", "text/html")
                     self.end_headers()
                     self.wfile.write(b"Authorization complete. You can close this tab.")
                     loop.call_soon_threadsafe(code_future.set_result, auth_code)
+                elif error:
+                    desc = query.get("error_description", ["Authorization denied"])[0]
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html")
+                    self.end_headers()
+                    self.wfile.write(f"Authorization denied: {desc}".encode())
+                    loop.call_soon_threadsafe(
+                        code_future.set_exception,
+                        PermissionError(f"OAuth denied: {error} — {desc}"),
+                    )
                 else:
                     self.send_response(400)
                     self.end_headers()
@@ -183,8 +199,16 @@ class OAuthFlow:
         thread = Thread(target=_serve_until_done, daemon=True)
         thread.start()
 
-        code = await code_future
-        server.server_close()
+        try:
+            code = await asyncio.wait_for(code_future, timeout=timeout)
+        except TimeoutError:
+            raise TimeoutError(
+                f"OAuth callback not received within {timeout}s — "
+                "ensure the browser completed the authorization flow"
+            ) from None
+        finally:
+            server.server_close()
+
         return code
 
     @staticmethod

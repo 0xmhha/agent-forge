@@ -163,7 +163,8 @@ class ToolServer:
                 return [TextContent(type="text", text=result.model_dump_json())]
             except Exception as exc:
                 logger.exception("Tool %s failed", name)
-                error_result = ToolResult(success=False, error=str(exc))
+                from shared.sanitize import sanitize
+                error_result = ToolResult(success=False, error=sanitize(str(exc)))
                 return [TextContent(type="text", text=error_result.model_dump_json())]
 
     def _handle_task_list(self, **kwargs: Any) -> ToolResult:

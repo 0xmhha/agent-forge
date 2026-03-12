@@ -1,15 +1,13 @@
 """CI debug environment — clones repo at failed commit and fetches logs."""
 
 import logging
-import re
 
 from github.actions.git_utils import clone_url, run_git
 from github.client import GitHubClient
+from shared.sanitize import sanitize as _sanitize
 from shared.types import ToolResult
 
 logger = logging.getLogger(__name__)
-
-_TOKEN_PATTERN = re.compile(r"ghp_[A-Za-z0-9]+|gho_[A-Za-z0-9]+|Bearer\s+\S+", re.IGNORECASE)
 
 
 class CIEnvironment:
@@ -59,7 +57,7 @@ class CIEnvironment:
             failed_jobs.append({
                 "name": job["name"],
                 "conclusion": job["conclusion"],
-                "log": _sanitize(log),
+                "log": _sanitize_log(log),
             })
 
         return ToolResult(
@@ -87,6 +85,6 @@ class CIEnvironment:
             return f"Log unavailable for job: {job_id}"
 
 
-def _sanitize(text: str) -> str:
+def _sanitize_log(text: str) -> str:
     """Remove tokens from log output."""
-    return _TOKEN_PATTERN.sub("[REDACTED]", text)
+    return _sanitize(text)

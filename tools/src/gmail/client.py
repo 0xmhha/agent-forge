@@ -19,8 +19,14 @@ class GmailClient:
     All public methods return sanitized dicts (no tokens, no raw headers).
     """
 
-    def __init__(self, token: StoredToken) -> None:
-        self._auth_header = f"{token.token_type} {token.access_token}"
+    def __init__(self, token: str | StoredToken) -> None:
+        if isinstance(token, str):
+            self._auth_header = f"Bearer {token}"
+        else:
+            self._auth_header = f"{token.token_type} {token.access_token}"
+        self._http = httpx.AsyncClient(
+            headers={"Authorization": self._auth_header, "Accept": "application/json"},
+        )
 
     async def list_messages(
         self,
@@ -67,18 +73,9 @@ class GmailClient:
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Send authenticated request to Gmail API."""
-        async with httpx.AsyncClient() as client:
-            response = await client.request(
-                method,
-                url,
-                headers={
-                    "Authorization": self._auth_header,
-                    "Accept": "application/json",
-                },
-                params=params,
-            )
-            response.raise_for_status()
-            return response.json()
+        response = await self._http.request(method, url, params=params)
+        response.raise_for_status()
+        return response.json()
 
 
 def _extract_metadata(message: dict[str, Any]) -> dict[str, Any]:

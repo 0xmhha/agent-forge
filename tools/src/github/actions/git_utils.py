@@ -7,11 +7,10 @@ without embedded tokens.
 
 import asyncio
 import logging
-import re
+
+from shared.sanitize import sanitize as _sanitize
 
 logger = logging.getLogger(__name__)
-
-_TOKEN_PATTERN = re.compile(r"ghp_[A-Za-z0-9]+|gho_[A-Za-z0-9]+|Bearer\s+\S+", re.IGNORECASE)
 
 
 async def run_git(*args: str, cwd: str | None = None) -> tuple[bool, str]:
@@ -31,7 +30,7 @@ async def run_git(*args: str, cwd: str | None = None) -> tuple[bool, str]:
     )
     stdout, _ = await proc.communicate()
     output = stdout.decode("utf-8", errors="replace").strip()
-    sanitized = _TOKEN_PATTERN.sub("[REDACTED]", output)
+    sanitized = _sanitize(output)
 
     return proc.returncode == 0, sanitized
 

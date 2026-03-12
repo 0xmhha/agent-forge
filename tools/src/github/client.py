@@ -16,6 +16,14 @@ class GitHubClient:
 
     def __init__(self, token: str) -> None:
         self._auth_header = f"Bearer {token}"
+        self._http = httpx.AsyncClient(
+            headers={
+                "Authorization": self._auth_header,
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            follow_redirects=True,
+        )
 
     async def list_issues(
         self,
@@ -82,18 +90,11 @@ class GitHubClient:
 
     async def get_job_log(self, repo: str, job_id: int) -> str:
         """Fetch plain-text log for a single job."""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{_GITHUB_API}/repos/{repo}/actions/jobs/{job_id}/logs",
-                headers={
-                    "Authorization": self._auth_header,
-                    "Accept": "application/vnd.github+json",
-                    "X-GitHub-Api-Version": "2022-11-28",
-                },
-                follow_redirects=True,
-            )
-            response.raise_for_status()
-            return response.text
+        response = await self._http.get(
+            f"{_GITHUB_API}/repos/{repo}/actions/jobs/{job_id}/logs",
+        )
+        response.raise_for_status()
+        return response.text
 
     async def get_ci_status(self, repo: str, ref: str) -> dict[str, Any]:
         """Get CI status for a commit ref (branch or SHA)."""
@@ -143,19 +144,9 @@ class GitHubClient:
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any] | list[dict[str, Any]]:
         """Send authenticated request to GitHub API."""
-        async with httpx.AsyncClient() as client:
-            response = await client.request(
-                method,
-                url,
-                headers={
-                    "Authorization": self._auth_header,
-                    "Accept": "application/vnd.github+json",
-                    "X-GitHub-Api-Version": "2022-11-28",
-                },
-                params=params,
-            )
-            response.raise_for_status()
-            return response.json()
+        response = await self._http.request(method, url, params=params)
+        response.raise_for_status()
+        return response.json()
 
 
 def _extract_issue(raw: dict[str, Any]) -> dict[str, Any]:
