@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"git commit\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "#!/bin/bash\ninput=$(cat)\ntier_file=\"/tmp/agent-forge-tier\"\ntier=$(cat \"$tier_file\" 2>/dev/null || echo \"unknown\")\nif [ \"$tier\" != \"micro\" ]; then\n  qr_done=$(cat /tmp/agent-forge-qr-done 2>/dev/null || echo \"no\")\n  if [ \"$qr_done\" != \"yes\" ]; then\n    echo '[agent-forge] QR gate not executed. Run /qr-gate before committing (Micro tier excluded).' >&2\n  fi\nfi\necho \"$input\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "#!/bin/bash\necho '[agent-forge] Session ending. Checklist:' >&2\necho '  - delta-log recorded? (delta-logs/M{N}-{slug}.json)' >&2\necho '  - rolling-summary updated? (delta-logs/rolling-summary.md)' >&2\necho '  - token metrics collected? (token_session_export)' >&2\nrm -f /tmp/agent-forge-tier /tmp/agent-forge-qr-done 2>/dev/null"
+          }
+        ]
+      }
+    ]
+  }
+}
