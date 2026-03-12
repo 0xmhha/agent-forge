@@ -81,6 +81,11 @@
           "type": "integer",
           "minimum": 0,
           "description": "캐시 생성 토큰"
+        },
+        "cost_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "세션 총 비용 (USD). token-monitor에서 자동 산출"
         }
       }
     },

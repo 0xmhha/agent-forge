@@ -4,7 +4,7 @@
   "title": "Delta Log Entry",
   "description": "마일스톤 완료 시 생성되는 델타 로그 엔트리 스키마. ACE(Agentic Context Engineering) 패턴에 기반하여 증분 컨텍스트를 구조화한다. 각 엔트리는 하나의 마일스톤에서 발생한 변경, 결정, 교훈을 기록하며, 결정론적 병합 규칙(merge-rules.md)에 따라 누적 컨텍스트에 병합된다.",
   "type": "object",
-  "required": ["milestone", "timestamp", "files_changed", "decisions"],
+  "required": ["milestone", "timestamp", "files_changed", "decisions", "qr_result"],
   "additionalProperties": false,
   "properties": {
     "milestone": {
@@ -97,6 +97,54 @@
         "maxLength": 200
       },
       "default": []
+    },
+    "qr_result": {
+      "type": "object",
+      "description": "QR(Quality Review) 게이트 실행 결과. Micro tier는 QR 생략이므로 이 필드가 없을 수 있음",
+      "additionalProperties": false,
+      "required": ["verdict", "iteration"],
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": ["PASS", "PASS_WITH_CONCERNS", "NEEDS_CHANGES"],
+          "description": "최종 판정"
+        },
+        "iteration": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "QR 반복 횟수 (몇 번째 시도에서 통과했는가)"
+        },
+        "findings": {
+          "type": "array",
+          "description": "발견 사항 요약 목록",
+          "items": {
+            "type": "object",
+            "required": ["category", "severity", "summary"],
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "type": "string",
+                "description": "발견 카테고리. 예: TESTING_GAP, INCONSISTENT_ERROR"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["MUST", "SHOULD", "COULD"],
+                "description": "심각도"
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 200,
+                "description": "발견 내용 요약"
+              },
+              "resolved": {
+                "type": "boolean",
+                "description": "이 마일스톤 내에서 해결되었는지 여부",
+                "default": false
+              }
+            }
+          }
+        }
+      }
     },
     "context_snapshot": {
       "type": "object",

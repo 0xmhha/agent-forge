@@ -114,7 +114,7 @@ domain_knowledge:
       description: string  # required, 왜 금지되는지 설명
       severity: enum       # required, values: [MUST, SHOULD, COULD]
       alternative: string  # required, 대신 사용해야 할 방법
-      detection_hint: string  # optional, 탐지를 위한 코드 패턴 힌트
+      detection_method: string  # optional, 탐지 방법 (grep 패턴, 검사 대상 범위, 구체적 절차)
 
   # 필수 패턴: 이 도메인에서 반드시 존재해야 하는 패턴
   # 해당 applies_to 범위의 코드에서 이 패턴이 없으면 QR finding으로 보고된다.

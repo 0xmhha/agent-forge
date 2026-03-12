@@ -39,36 +39,74 @@ Claude Code 세션 종료 시 표시되는 토큰 정보를 기록:
 
 ---
 
-## 방법 2: ccusage 연동 (방법 1 이후)
+## 방법 2: token-monitor 연동 (방법 1 이후)
+
+Go 기반 실시간 토큰 모니터링 도구. ccusage의 개념을 기반으로 실시간 기능을 추가한 프로젝트.
 
 ### 사전 조건
 
 ```bash
-# ccusage 설치 확인
-which ccusage || npm install -g ccusage
+# token-monitor 설치 확인
+which token-monitor || go install github.com/user/token-monitor@latest
+```
+
+### 실시간 모니터링
+
+```bash
+# 현재 세션 실시간 감시 (fsnotify 기반)
+token-monitor watch
+
+# 특정 프로젝트 감시 + 번 레이트 표시
+token-monitor watch --project "mcp-tools"
 ```
 
 ### 세션 토큰 자동 추출
 
 ```bash
-# 오늘의 세션별 토큰
-ccusage --daily --format json
+# 세션 목록 조회
+token-monitor session list
 
-# 특정 프로젝트의 세션
-ccusage --session --project "backend-api" --format json
+# 특정 세션 JSON 내보내기
+token-monitor session export <session-name> --format json --output session-tokens.json
+```
+
+### ExportSummary → session-log 필드 매핑
+
+token-monitor의 JSON 출력을 session-log-schema의 tokens 필드에 매핑:
+
+| token-monitor (ExportSummary) | session-log (tokens) |
+|-------------------------------|---------------------|
+| `total_tokens` | `tokens.total` |
+| `total_input_tokens` | `tokens.input` |
+| `total_output_tokens` | `tokens.output` |
+| `total_cache_read_tokens` | `tokens.cache_read` |
+| `total_cache_creation_tokens` | `tokens.cache_create` |
+| `total_cost_usd` | `tokens.cost_usd` (신규) |
+| `first_entry` / `last_entry` | `duration_minutes` 계산에 활용 |
+
+### 세션 종료 후 토큰 수집 워크플로우
+
+```
+1. 세션 종료
+2. token-monitor session export <name> --format json
+3. 출력의 summary 블록에서 토큰 필드 추출
+4. session-log.json의 tokens 섹션에 기입
+5. first_entry/last_entry 차이로 duration_minutes 계산
 ```
 
 ### 활용
 
-- 방법 1의 `tokens` 필드를 자동으로 채울 수 있음
-- `input`, `output`, `cache_read`, `cache_create` 분해 가능
-- 모델별 토큰 분포 확인 가능
+- **실시간**: `watch` 명령으로 세션 진행 중 토큰 소비 추적
+- **사후 분석**: `session export`로 정확한 토큰 분해 제공
+- `input`, `output`, `cache_read`, `cache_create` 완전 분해
+- `cost_usd`로 비용까지 자동 계산
+- `first_entry`/`last_entry`로 세션 duration 자동 산출
 
 ### 한계
 
-- QR 반복 횟수, 재작업 횟수는 ccusage로 수집 불가
+- QR 반복 횟수, 재작업 횟수는 token-monitor로 수집 불가
 - 워크플로우 tier, 도메인 프로필은 수동 기록 필요
-- ccusage는 비용 측면만 커버, 품질 측면은 별도
+- token-monitor는 비용/토큰 측면만 커버, 품질 측면은 별도
 
 ---
 
@@ -151,8 +189,9 @@ cat session.jsonl | jq -r '
 즉시        방법 1 (수동 세션 로그) 시작
             └─ 5개 세션 축적
 
-5개 세션 후  방법 2 (ccusage) 연동
-            └─ tokens 필드 자동화
+5개 세션 후  방법 2 (token-monitor) 연동
+            └─ tokens + duration 필드 자동화
+            └─ 실시간 watch로 세션 중 모니터링
             └─ 10개 세션 축적
 
 10개 세션 후 첫 번째 분석 수행

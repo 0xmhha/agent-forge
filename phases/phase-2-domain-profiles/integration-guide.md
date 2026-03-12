@@ -61,17 +61,21 @@ QR 출력:
 - Fix: Decimal 라이브러리 또는 정수(센트 단위) 사용
 ```
 
-### detection_hint 활용
+### detection_method 활용
 
-`detection_hint` 필드는 에이전트가 코드에서 패턴을 탐지하는 데 사용된다.
-정규표현식이나 AST 패턴이 아닌, 자연어 힌트로 제공하여 LLM이 유연하게 해석한다.
+`detection_method` 필드는 에이전트가 코드에서 패턴을 **어떻게 검사하는지** 구체적으로 기술한다.
+단순 힌트가 아니라, 검사 대상 범위와 절차를 포함해야 한다.
 
 ```yaml
-detection_hint: "float|double 타입과 currency/amount/price 변수명 조합"
+detection_method: "grep으로 return.*ToolResult 지점을 전수 검사. 각 반환 값의 error 필드에 토큰 패턴(ghp_, gho_, sk-) 포함 여부 확인"
 ```
 
-에이전트는 이 힌트를 참고하여 코드를 검사하되, 힌트에 없는 패턴도
-도메인 지식을 기반으로 추가 탐지할 수 있다.
+**좋은 detection_method 작성 가이드**:
+- **범위**: 어떤 파일/함수를 검사하는가 (예: "모든 API 핸들러", "return 문")
+- **방법**: grep, AST 검사, 변수 추적 등 구체적 도구/기법
+- **판정**: 어떤 상태이면 위반으로 판정하는가
+
+에이전트는 이 방법을 기반으로 검사하되, 추가적인 도메인 지식 기반 탐지도 수행할 수 있다.
 
 ---
 
