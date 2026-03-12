@@ -24,7 +24,7 @@ class TestServerIntegration:
         assert "task_update" in server._tools
 
     def test_gmail_tools_register(self):
-        """Gmail module should add 3 tools to server."""
+        """Gmail module should add 5 tools to server (3 basic + 2 rule-based)."""
         from shared.server import ToolServer
         from gmail.tools import register as register_gmail
 
@@ -32,10 +32,12 @@ class TestServerIntegration:
         initial_count = len(server._tools)
         register_gmail(server)
 
-        assert len(server._tools) == initial_count + 3
+        assert len(server._tools) == initial_count + 5
         assert "gmail_list_messages" in server._tools
         assert "gmail_read_message" in server._tools
         assert "gmail_search" in server._tools
+        assert "gmail_process_inbox" in server._tools
+        assert "gmail_read_and_analyze" in server._tools
 
     def test_github_tools_register(self):
         """GitHub module should add 5 monitoring tools to server."""
@@ -64,7 +66,7 @@ class TestServerIntegration:
         assert "github_setup_ci_debug" in server._tools
 
     def test_all_tools_register_together(self):
-        """All modules should register without conflicts. Total: 13 tools."""
+        """All modules should register without conflicts. Total: 15 tools."""
         from shared.server import ToolServer
         from gmail.tools import register as register_gmail
         from github.tools import register as register_github
@@ -75,7 +77,7 @@ class TestServerIntegration:
         register_github(server)
         register_actions(server)
 
-        assert len(server._tools) == 13
+        assert len(server._tools) == 15
         all_names = list(server._tools.keys())
         assert len(all_names) == len(set(all_names)), "Duplicate tool names detected"
 
@@ -298,7 +300,7 @@ class TestMCPServerProtocol:
         register_actions(server)
 
         tools = list(server._tools.values())
-        assert len(tools) == 13
+        assert len(tools) == 15
 
         for tool in tools:
             assert tool.name

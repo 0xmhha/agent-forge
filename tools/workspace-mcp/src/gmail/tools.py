@@ -9,6 +9,7 @@ import logging
 from typing import Any
 
 from gmail.client import GmailClient
+from gmail.rules.processor import process_email, process_inbox
 from shared.sanitize import sanitize
 from shared.server import ToolServer
 from shared.types import ToolResult
@@ -82,6 +83,51 @@ def register(server: ToolServer) -> None:
             "required": ["query"],
         },
         handler=_make_handler(client, _handle_search),
+    )
+
+    server.register_tool(
+        name="gmail_process_inbox",
+        description=(
+            "Scan inbox for Jira ticket emails, classify by action type, "
+            "and return structured results with action-required items highlighted"
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Gmail search query to narrow scope (default: recent emails)",
+                    "default": "",
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum emails to process",
+                    "default": 20,
+                    "minimum": 1,
+                    "maximum": 50,
+                },
+            },
+        },
+        handler=_make_handler(client, _handle_process_inbox),
+    )
+
+    server.register_tool(
+        name="gmail_read_and_analyze",
+        description=(
+            "Read a specific email and analyze it for Jira ticket references "
+            "and action classification"
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "message_id": {
+                    "type": "string",
+                    "description": "Gmail message ID",
+                },
+            },
+            "required": ["message_id"],
+        },
+        handler=_make_handler(client, _handle_read_and_analyze),
     )
 
 
@@ -158,4 +204,50 @@ async def _handle_search(
     return ToolResult(
         success=True,
         data={"messages": results, "count": len(results)},
+    )
+
+
+async def _handle_process_inbox(
+    *,
+    client: GmailClient,
+    query: str = "",
+    max_results: int = 20,
+) -> ToolResult:
+    """Handle gmail_process_inbox tool call.
+
+    Fetches emails, runs rule-based Jira detection and classification,
+    returns structured inbox summary.
+    """
+    messages = await client.list_messages(query=query, max_results=max_results)
+
+    # Read full body for each message to enable better detection
+    full_messages = []
+    for msg in messages:
+        full = await client.read_message(msg["id"])
+        full_messages.append(full)
+
+    summary = process_inbox(full_messages)
+    return ToolResult(
+        success=True,
+        data=summary.model_dump(),
+    )
+
+
+async def _handle_read_and_analyze(
+    *,
+    client: GmailClient,
+    message_id: str,
+) -> ToolResult:
+    """Handle gmail_read_and_analyze tool call.
+
+    Reads a single email and applies Jira detection + classification rules.
+    """
+    message = await client.read_message(message_id)
+    processed = process_email(message)
+    return ToolResult(
+        success=True,
+        data={
+            "message": message,
+            "analysis": processed.model_dump(),
+        },
     )

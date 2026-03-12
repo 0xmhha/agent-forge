@@ -14,18 +14,20 @@ from shared.types import ToolResult
 class TestGmailToolRegistration:
     """Gmail tools should register correctly with the MCP server."""
 
-    def test_register_adds_three_tools(self):
-        """Gmail module should register exactly 3 tools."""
+    def test_register_adds_tools(self):
+        """Gmail module should register all tools including rule-based processors."""
         from gmail.tools import register
 
         mock_server = MagicMock()
         register(mock_server)
 
-        assert mock_server.register_tool.call_count == 3
+        assert mock_server.register_tool.call_count == 5
         tool_names = [call.kwargs["name"] for call in mock_server.register_tool.call_args_list]
         assert "gmail_list_messages" in tool_names
         assert "gmail_read_message" in tool_names
         assert "gmail_search" in tool_names
+        assert "gmail_process_inbox" in tool_names
+        assert "gmail_read_and_analyze" in tool_names
 
     def test_tool_schemas_have_required_fields(self):
         """Each tool schema should define proper input parameters."""
