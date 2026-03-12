@@ -1,0 +1,56 @@
+# {{PROJECT_NAME}}
+
+## agent-forge Methodology
+
+이 프로젝트는 agent-forge 방법론을 적용하여 Claude Code 작업을 자동화한다.
+
+### 워크플로우
+
+1. **작업 시작** → `/complexity`로 Tier 판정
+2. **코딩** → 작업 수행
+3. **완료** → `/milestone`로 일괄 처리 (QR → delta-log → 토큰 → 커밋)
+
+### Tier 분기
+
+| Tier | 파일 수 | 절차 |
+|------|---------|------|
+| Micro | 1-2 | 직접 실행 → 커밋 |
+| Standard | 3-10 | 계획 → 실행 → QR 1회 → 커밋 |
+| Full | 10+ | 계획 → 마일스톤별 (실행 → QR) → 커밋 |
+
+### 사용 가능한 명령
+
+| 명령 | 용도 |
+|------|------|
+| `/complexity` | 복잡도 평가, Tier 추천 |
+| `/qr-gate` | Quality Review (커밋 전 필수, Micro 제외) |
+| `/delta-log` | delta-log 엔트리 + rolling-summary 생성 |
+| `/milestone` | 전체 완료 워크플로우 일괄 실행 |
+
+### 커밋 규칙
+
+- 영어 conventional commits (feat/fix/refactor/docs/test)
+- Co-Author, AI attribution 금지
+
+### 코드 표준
+
+- 파일 200-400줄 (최대 800), 함수 <50줄
+- Immutability first
+- 에러 핸들링 필수
+- 시크릿 하드코딩 금지
+
+---
+아래에 프로젝트 고유 내용을 추가한다.
+---
+
+## Project Overview
+
+{{PROJECT_DESCRIPTION}}
+
+## Architecture
+
+{{ARCHITECTURE}}
+
+## Development Commands
+
+{{DEV_COMMANDS}}
