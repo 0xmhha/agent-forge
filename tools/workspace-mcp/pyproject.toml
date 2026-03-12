@@ -23,6 +23,7 @@ dev = [
 
 [project.scripts]
 agent-forge-server = "shared.server:main"
+agent-forge-setup = "shared.auth.setup:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
