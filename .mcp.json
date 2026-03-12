@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "agent-forge-tools": {
-      "command": "tools/.venv/bin/python",
+      "command": "tools/mcp-tools/.venv/bin/python",
       "args": ["-m", "shared.server"],
-      "cwd": "tools",
+      "cwd": "tools/mcp-tools",
       "env": {
         "PYTHONPATH": "src"
       }
