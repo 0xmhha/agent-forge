@@ -1,9 +1,17 @@
 {
   "mcpServers": {
-    "agent-forge-tools": {
-      "command": "tools/mcp-tools/.venv/bin/python",
+    "workspace-mcp": {
+      "command": "tools/workspace-mcp/.venv/bin/python",
       "args": ["-m", "shared.server"],
-      "cwd": "tools/mcp-tools",
+      "cwd": "tools/workspace-mcp",
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    },
+    "token-monitor-mcp": {
+      "command": "tools/token-monitor-mcp/.venv/bin/python",
+      "args": ["-m", "token_monitor_mcp.server"],
+      "cwd": "tools/token-monitor-mcp",
       "env": {
         "PYTHONPATH": "src"
       }
