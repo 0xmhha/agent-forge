@@ -69,7 +69,7 @@ REASONING: [max 30 words]
 ### Step 7: QR 완료 기록
 
 ```bash
-!`mkdir -p .claude/agent-forge-state && echo "yes" > .claude/agent-forge-state/qr-done && echo "QR gate completed"`
+!`mkdir -p .agent-forge-state && echo "yes" > .agent-forge-state/qr-done && echo "QR gate completed"`
 ```
 
 NEEDS_CHANGES이면 문제를 수정한 후 다시 /qr-gate를 실행한다.

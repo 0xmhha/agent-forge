@@ -36,7 +36,7 @@ ELSE:
 ### Step 3: Tier 기록
 
 ```bash
-!`mkdir -p .claude/agent-forge-state && echo "{tier}" > .claude/agent-forge-state/tier && echo "Tier set: {tier}"`
+!`mkdir -p .agent-forge-state && echo "{tier}" > .agent-forge-state/tier && echo "Tier set: {tier}"`
 ```
 
 ### Step 4: 출력
