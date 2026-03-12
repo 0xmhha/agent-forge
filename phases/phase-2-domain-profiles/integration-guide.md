@@ -195,6 +195,22 @@ project-root/
       domain-profile.yaml     ← 게임 엔진은 game-dev 프로필
 ```
 
+### 멀티 MCP 프로젝트 (tools/ 패턴)
+
+`tools/` 하위에 여러 MCP 서버가 독립 프로젝트로 존재하는 경우:
+
+```
+project-root/
+  tools/
+    workspace-mcp/
+      domain-profile.yaml     ← 토큰 격리 중심 프로필
+    token-monitor-mcp/
+      (프로필 없음)            ← 상위 탐색 → 루트 또는 기본값 적용
+```
+
+**각 MCP 서버는 독립 프로필을 보유할 수 있다.** 없으면 가장 가까운 상위 프로필이 적용된다.
+단, 상위 프로필의 forbidden_patterns 중 해당 MCP에 무관한 항목은 `applies_to` 필드로 필터링된다.
+
 **적용 규칙**:
 1. 현재 작업 파일에서 가장 가까운 상위 디렉토리의 `domain-profile.yaml` 적용
 2. 디렉토리별 프로필이 없으면 프로젝트 루트 프로필 적용

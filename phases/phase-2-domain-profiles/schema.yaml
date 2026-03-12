@@ -115,6 +115,7 @@ domain_knowledge:
       severity: enum       # required, values: [MUST, SHOULD, COULD]
       alternative: string  # required, 대신 사용해야 할 방법
       detection_method: string  # optional, 탐지 방법 (grep 패턴, 검사 대상 범위, 구체적 절차)
+      applies_to: string   # optional, 적용 범위 (특정 도구/모듈만 해당 시 명시. 없으면 전체 적용)
 
   # 필수 패턴: 이 도메인에서 반드시 존재해야 하는 패턴
   # 해당 applies_to 범위의 코드에서 이 패턴이 없으면 QR finding으로 보고된다.

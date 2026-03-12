@@ -31,6 +31,20 @@
 
 매 마일스톤 완료 시 "델타 엔트리"를 생성하여 누적.
 
+**저장 위치**: 프로젝트 루트 `delta-logs/` 디렉토리.
+도구별이 아닌 마일스톤별로 관리한다. 멀티 MCP 프로젝트에서도 delta-logs는 프로젝트 레벨에 단일 디렉토리로 유지한다.
+
+```
+project-root/
+  delta-logs/           ← 프로젝트 전체의 마일스톤별 기록
+    M0-baseline.json
+    M6-handler-wiring.json
+    rolling-summary.md
+  tools/
+    workspace-mcp/      ← 도구 코드만
+    token-monitor-mcp/
+```
+
 **델타 엔트리 스키마**:
 
 ```json
