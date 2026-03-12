@@ -14,7 +14,7 @@ user-invocable: true
 ### Step 1: Tier 확인
 
 ```bash
-!`cat /tmp/agent-forge-tier 2>/dev/null || echo "unknown"`
+!`cat .claude/agent-forge-state/tier 2>/dev/null || echo "unknown"`
 ```
 
 Tier가 미설정이면 /complexity를 먼저 실행하도록 안내한다.
@@ -66,5 +66,5 @@ token-monitor MCP가 사용 가능하면:
 다음 작업을 위해 tier를 리셋한다:
 
 ```bash
-!`rm -f /tmp/agent-forge-tier /tmp/agent-forge-qr-done`
+!`rm -rf .claude/agent-forge-state`
 ```

@@ -11,6 +11,7 @@ tools/*/bin/token-monitor
 # Claude Code (installed by dist/install.sh)
 .claude/skills/
 .claude/settings.json
+.claude/agent-forge-state/
 
 # OS
 .DS_Store
