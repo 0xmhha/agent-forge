@@ -23,13 +23,26 @@ _REPO_PARAM = {
 }
 
 
+_shared_client: GitHubClient | None = None
+
+
+def _get_or_create_client(server: ToolServer) -> GitHubClient | None:
+    """Get existing shared client or create and track a new one."""
+    global _shared_client
+    if _shared_client is None:
+        _shared_client = _create_client()
+        if _shared_client is not None:
+            server.track_client(_shared_client)
+    return _shared_client
+
+
 def register(server: ToolServer) -> None:
     """Register all GitHub monitoring tools with the MCP server.
 
     Creates a GitHubClient from GITHUB_TOKEN env var if available.
     Tools return clear error messages when credentials are missing.
     """
-    client = _create_client()
+    client = _get_or_create_client(server)
 
     server.register_tool(
         name="github_list_issues",
@@ -121,7 +134,7 @@ def register(server: ToolServer) -> None:
 
 def register_actions(server: ToolServer) -> None:
     """Register environment setup tools (PR review, CI debug)."""
-    client = _create_client()
+    client = _get_or_create_client(server)
 
     server.register_tool(
         name="github_setup_pr_review",

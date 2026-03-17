@@ -26,6 +26,16 @@ def task_store(tmp_dir):
     return FileTaskStore(store_dir=tmp_dir / "tasks")
 
 
+@pytest.fixture(autouse=True)
+def _reset_github_shared_client():
+    """Reset global _shared_client between tests to prevent state leakage."""
+    import github.tools as gt
+
+    gt._shared_client = None
+    yield
+    gt._shared_client = None
+
+
 @pytest.fixture
 def gmail_token():
     return StoredToken(

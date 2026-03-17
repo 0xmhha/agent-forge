@@ -162,3 +162,10 @@ class TestGmailClient:
     async def test_request_uses_auth_header(self, client):
         """Internal _request should send Authorization header (but never return it)."""
         assert client._auth_header == "Bearer ya29.test-access-token"
+
+    @pytest.mark.asyncio
+    async def test_aclose_releases_http_client(self, client):
+        """aclose() should close the underlying httpx.AsyncClient."""
+        with patch.object(client._http, "aclose", new_callable=AsyncMock) as mock_close:
+            await client.aclose()
+            mock_close.assert_called_once()

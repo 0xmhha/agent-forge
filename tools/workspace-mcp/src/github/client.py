@@ -136,6 +136,10 @@ class GitHubClient:
             "failed_jobs": failed_jobs,
         }
 
+    async def aclose(self) -> None:
+        """Close the underlying HTTP client and release connection pool resources."""
+        await self._http.aclose()
+
     async def _request(
         self,
         method: str,

@@ -235,3 +235,22 @@ def _patch_request_sequence(client, return_values):
 
     mock = AsyncMock(side_effect=return_values)
     return patch.object(client, "_request", mock)
+
+
+class TestGitHubClientLifecycle:
+    """AsyncClient should be properly closed to avoid resource leaks."""
+
+    @pytest.fixture
+    def client(self):
+        from github.client import GitHubClient
+
+        return GitHubClient(token="ghp_test_token")
+
+    @pytest.mark.asyncio
+    async def test_aclose_releases_http_client(self, client):
+        """aclose() should close the underlying httpx.AsyncClient."""
+        from unittest.mock import patch
+
+        with patch.object(client._http, "aclose", new_callable=AsyncMock) as mock_close:
+            await client.aclose()
+            mock_close.assert_called_once()

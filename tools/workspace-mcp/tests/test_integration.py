@@ -314,3 +314,51 @@ class TestMCPServerProtocol:
         server = ToolServer()
         handler = server._handlers.get("nonexistent_tool")
         assert handler is None
+
+
+class TestClientLifecycle:
+    """API clients should be tracked and cleaned up on shutdown."""
+
+    def test_track_client(self):
+        """track_client should add client to the tracked list."""
+        from shared.server import ToolServer
+
+        server = ToolServer()
+        mock_client = AsyncMock()
+        server.track_client(mock_client)
+
+        assert len(server._clients) == 1
+
+    @pytest.mark.asyncio
+    async def test_close_clients_calls_aclose(self):
+        """close_clients should call aclose() on all tracked clients."""
+        from shared.server import ToolServer
+
+        server = ToolServer()
+        client_a = AsyncMock()
+        client_b = AsyncMock()
+        server.track_client(client_a)
+        server.track_client(client_b)
+
+        await server.close_clients()
+
+        client_a.aclose.assert_called_once()
+        client_b.aclose.assert_called_once()
+        assert len(server._clients) == 0
+
+    @pytest.mark.asyncio
+    async def test_close_clients_handles_error_gracefully(self):
+        """close_clients should not raise even if one client fails to close."""
+        from shared.server import ToolServer
+
+        server = ToolServer()
+        failing_client = AsyncMock()
+        failing_client.aclose.side_effect = RuntimeError("connection lost")
+        healthy_client = AsyncMock()
+        server.track_client(failing_client)
+        server.track_client(healthy_client)
+
+        await server.close_clients()
+
+        healthy_client.aclose.assert_called_once()
+        assert len(server._clients) == 0

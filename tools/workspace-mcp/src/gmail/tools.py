@@ -24,6 +24,8 @@ def register(server: ToolServer) -> None:
     Tools return clear error messages when credentials are missing.
     """
     client = _create_client(server)
+    if client is not None:
+        server.track_client(client)
 
     server.register_tool(
         name="gmail_list_messages",
