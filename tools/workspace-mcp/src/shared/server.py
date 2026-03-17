@@ -318,8 +318,10 @@ def _register_watchers(scheduler, server: ToolServer) -> None:
 def main() -> None:
     """CLI entry point."""
     from dotenv import load_dotenv
+    from shared.logging import setup_logging
     load_dotenv()
-    logging.basicConfig(level=logging.INFO)
+    setup_logging()
+    logger.info("workspace-mcp server starting")
     asyncio.run(run_server())
 
 
