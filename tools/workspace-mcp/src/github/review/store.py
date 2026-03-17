@@ -65,13 +65,20 @@ class ReviewStore:
         return self._list_folder(self._todo)
 
     def has_pending(self, repo: str, pr_number: int) -> bool:
-        """Check if a review request already exists in pending or done."""
+        """Check if a review request already exists in pending, done, or todo."""
         safe_repo = repo.replace("/", "-")
         pattern = f"{safe_repo}-{pr_number}-"
         return (
             any(f.name.startswith(pattern) for f in self._pending.glob("*.md"))
             or any(f.name.startswith(pattern) for f in self._done.glob("*.md"))
+            or self.has_todo(repo, pr_number)
         )
+
+    def has_todo(self, repo: str, pr_number: int) -> bool:
+        """Check if a todo work document exists for this review."""
+        safe_repo = repo.replace("/", "-")
+        pattern = f"newjob-{safe_repo}-{pr_number}-"
+        return any(f.name.startswith(pattern) for f in self._todo.glob("*.md"))
 
     def _list_folder(self, folder: Path) -> list[dict]:
         files = sorted(folder.glob("*.md"), key=lambda f: f.stat().st_mtime, reverse=True)

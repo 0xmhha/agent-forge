@@ -1,11 +1,13 @@
 """GitHub review request watcher — batch process that scans Gmail periodically.
 
 Detects PR review request emails, fetches PR details from GitHub API,
-and saves structured review documents to the file store.
+and saves structured review documents (pending + todo) to the file store.
 """
 
 import logging
 from typing import Any
+
+import httpx
 
 from github.client import GitHubClient
 from github.review.detector import detect_review_request
@@ -36,32 +38,48 @@ class GitHubReviewWatcher:
         return "github_review"
 
     async def run_once(self) -> None:
-        """Scan Gmail for new review requests and process them."""
+        """Scan Gmail for new review requests, save pending and todo files."""
         logger.info("Scanning Gmail for review requests...")
 
         emails = await self._gmail.list_messages(query=_GMAIL_QUERY, max_results=20)
         new_count = 0
 
         for email_meta in emails:
-            full_email = await self._gmail.read_message(email_meta["id"])
-            detection = detect_review_request(full_email)
-
-            if not detection.is_review_request:
-                continue
-
-            if not detection.repo or not detection.pr_number:
-                logger.warning("Review detected but missing repo/PR: %s", full_email.get("subject"))
-                continue
-
-            if self._store.has_pending(detection.repo, detection.pr_number):
-                continue
-
-            review = await self._build_review_request(detection, full_email)
-            self._store.save_pending(review)
-            new_count += 1
-            logger.info("New review request: %s#%d", review.repo, review.pr_number)
+            try:
+                new = await self._process_email(email_meta)
+                if new:
+                    new_count += 1
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 429:
+                    logger.warning("Rate limited, stopping scan early")
+                    break
+                logger.warning("Failed to process email %s: %s", email_meta.get("id"), exc)
+            except Exception:
+                logger.exception("Unexpected error processing email %s", email_meta.get("id"))
 
         logger.info("Scan complete: %d new review request(s) found", new_count)
+
+    async def _process_email(self, email_meta: dict[str, Any]) -> bool:
+        """Process a single email. Returns True if a new review was saved."""
+        full_email = await self._gmail.read_message(email_meta["id"])
+        detection = detect_review_request(full_email)
+
+        if not detection.is_review_request:
+            return False
+
+        if not detection.repo or not detection.pr_number:
+            logger.warning("Review detected but missing repo/PR: %s", full_email.get("subject"))
+            return False
+
+        if self._store.has_pending(detection.repo, detection.pr_number):
+            logger.debug("Already tracked: %s#%d", detection.repo, detection.pr_number)
+            return False
+
+        review = await self._build_review_request(detection, full_email)
+        self._store.save_pending(review)
+        self._store.save_todo(review)
+        logger.info("New review request + todo: %s#%d", review.repo, review.pr_number)
+        return True
 
     async def _build_review_request(
         self,
