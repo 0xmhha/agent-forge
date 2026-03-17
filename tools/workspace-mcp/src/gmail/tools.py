@@ -134,7 +134,11 @@ def register(server: ToolServer) -> None:
 
 
 def _create_client(server: ToolServer) -> GmailClient | None:
-    """Create GmailClient from stored OAuth token, or None if unavailable."""
+    """Create GmailClient from stored OAuth token with auto-refresh.
+
+    Wires OAuthFlow as a token_provider so the client refreshes its
+    Authorization header when the token expires mid-session.
+    """
     try:
         from shared.auth.credentials import load_gmail_config
         from shared.auth.oauth_flow import OAuthFlow
@@ -148,7 +152,13 @@ def _create_client(server: ToolServer) -> GmailClient | None:
             logger.warning("Gmail: no stored token — tools will return auth-required error")
             return None
 
-        return GmailClient(token=token.access_token)
+        oauth_flow = OAuthFlow(config=config, token_store=token_store)
+
+        async def _provide_token() -> str | None:
+            refreshed = await oauth_flow.get_valid_token()
+            return refreshed.access_token if refreshed else None
+
+        return GmailClient(token=token.access_token, token_provider=_provide_token)
     except Exception:
         logger.exception("Gmail client initialization failed")
         return None

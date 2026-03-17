@@ -1,15 +1,21 @@
 """Gmail API client — read-only access, tokens never exposed in responses."""
 
 import base64
+import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import httpx
 
 from shared.auth.token_store import StoredToken
 
+logger = logging.getLogger(__name__)
+
 _GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 
 _HEADER_FIELDS = {"From", "To", "Subject", "Date"}
+
+TokenProvider = Callable[[], Awaitable[str | None]]
 
 
 class GmailClient:
@@ -17,13 +23,22 @@ class GmailClient:
 
     Auth header is stored internally and never included in return values.
     All public methods return sanitized dicts (no tokens, no raw headers).
+
+    If a token_provider is given, the client refreshes its Authorization
+    header before each request, enabling mid-session token renewal.
     """
 
-    def __init__(self, token: str | StoredToken) -> None:
+    def __init__(
+        self,
+        token: str | StoredToken,
+        *,
+        token_provider: TokenProvider | None = None,
+    ) -> None:
         if isinstance(token, str):
             self._auth_header = f"Bearer {token}"
         else:
             self._auth_header = f"{token.token_type} {token.access_token}"
+        self._token_provider = token_provider
         self._http = httpx.AsyncClient(
             headers={"Authorization": self._auth_header, "Accept": "application/json"},
         )
@@ -69,6 +84,20 @@ class GmailClient:
         """Close the underlying HTTP client and release connection pool resources."""
         await self._http.aclose()
 
+    async def _ensure_fresh_token(self) -> None:
+        """Refresh the Authorization header if a token_provider is configured."""
+        if self._token_provider is None:
+            return
+        fresh_token = await self._token_provider()
+        if fresh_token is None:
+            logger.warning("Token provider returned None — using cached header")
+            return
+        new_header = f"Bearer {fresh_token}"
+        if new_header != self._auth_header:
+            self._auth_header = new_header
+            self._http.headers["Authorization"] = new_header
+            logger.debug("Gmail token refreshed")
+
     async def _request(
         self,
         method: str,
@@ -77,7 +106,10 @@ class GmailClient:
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Send authenticated request to Gmail API."""
+        await self._ensure_fresh_token()
+        logger.debug("Gmail API: %s %s params=%s", method, url, params)
         response = await self._http.request(method, url, params=params)
+        logger.debug("Gmail API response: %s %d", url, response.status_code)
         response.raise_for_status()
         return response.json()
 

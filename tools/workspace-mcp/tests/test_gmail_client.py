@@ -169,3 +169,95 @@ class TestGmailClient:
         with patch.object(client._http, "aclose", new_callable=AsyncMock) as mock_close:
             await client.aclose()
             mock_close.assert_called_once()
+
+
+class TestGmailClientTokenRefresh:
+    """Token provider should refresh the Authorization header mid-session."""
+
+    @pytest.fixture
+    def token_provider(self):
+        return AsyncMock(return_value="ya29.new-refreshed-token")
+
+    @pytest.fixture
+    def client_with_provider(self, gmail_token, token_provider):
+        from gmail.client import GmailClient
+
+        return GmailClient(token=gmail_token, token_provider=token_provider)
+
+    @pytest.mark.asyncio
+    async def test_refreshes_header_before_request(self, client_with_provider, token_provider):
+        """_request should call token_provider and update Authorization header."""
+        with patch.object(
+            client_with_provider._http, "request", new_callable=AsyncMock
+        ) as mock_http:
+            mock_response = AsyncMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"messages": []}
+            mock_response.raise_for_status = lambda: None
+            mock_http.return_value = mock_response
+
+            await client_with_provider._request("GET", "https://example.com")
+
+        token_provider.assert_called_once()
+        assert client_with_provider._auth_header == "Bearer ya29.new-refreshed-token"
+
+    @pytest.mark.asyncio
+    async def test_keeps_cached_header_when_provider_returns_none(self, gmail_token):
+        """If token_provider returns None, keep the existing header."""
+        from gmail.client import GmailClient
+
+        provider = AsyncMock(return_value=None)
+        client = GmailClient(token=gmail_token, token_provider=provider)
+        original_header = client._auth_header
+
+        with patch.object(client._http, "request", new_callable=AsyncMock) as mock_http:
+            mock_response = AsyncMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {}
+            mock_response.raise_for_status = lambda: None
+            mock_http.return_value = mock_response
+
+            await client._request("GET", "https://example.com")
+
+        assert client._auth_header == original_header
+
+    @pytest.mark.asyncio
+    async def test_no_provider_skips_refresh(self):
+        """Without token_provider, _ensure_fresh_token is a no-op."""
+        from gmail.client import GmailClient
+
+        client_no_provider = GmailClient(token="static-token")
+        original_header = client_no_provider._auth_header
+
+        with patch.object(
+            client_no_provider._http, "request", new_callable=AsyncMock
+        ) as mock_http:
+            mock_response = AsyncMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {}
+            mock_response.raise_for_status = lambda: None
+            mock_http.return_value = mock_response
+
+            await client_no_provider._request("GET", "https://example.com")
+
+        assert client_no_provider._auth_header == original_header
+
+    @pytest.mark.asyncio
+    async def test_header_only_updates_when_token_changes(self, gmail_token):
+        """If provider returns same token, header shouldn't be reassigned."""
+        from gmail.client import GmailClient
+
+        provider = AsyncMock(return_value="ya29.test-access-token")
+        client = GmailClient(token=gmail_token, token_provider=provider)
+
+        with patch.object(client._http, "request", new_callable=AsyncMock) as mock_http:
+            mock_response = AsyncMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {}
+            mock_response.raise_for_status = lambda: None
+            mock_http.return_value = mock_response
+
+            await client._request("GET", "https://example.com")
+
+        # Same token — header value unchanged
+        assert client._auth_header == "Bearer ya29.test-access-token"
