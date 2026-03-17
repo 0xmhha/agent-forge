@@ -3,12 +3,29 @@
 Gmail + GitHub MCP 서버. 이메일에서 Jira 티켓을 감지하고, GitHub 이슈/PR/CI 상태를 모니터링한다.
 LLM에 토큰이 노출되지 않도록 룰베이스로 동작하며, 결과만 구조화하여 반환한다.
 
-## 설치
+## Quick Start
 
 ```bash
+# 1. 설치
 cd tools/workspace-mcp
 uv sync
+
+# 2. 환경변수 설정
+cp .env.sample .env
+# .env 파일에 GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET 입력
+
+# 3. OAuth 인증 (최초 1회, 토큰 만료 시 재실행)
+uv run python -m shared.auth.setup
+# → http://localhost:8919 에서 Gmail/GitHub 연결
+
+# 4. MCP 서버 실행 (Claude Code가 자동 연결)
+uv run agent-forge-server
 ```
+
+> **Setup UI vs MCP 서버**: Setup UI는 OAuth 토큰을 발급·저장하는 인증 도구 (최초 1회).
+> MCP 서버는 저장된 토큰으로 Gmail/GitHub API를 호출하는 도구 서버 (매 세션).
+
+## 설치 (상세)
 
 ## 초기 설정: Gmail 연동
 
@@ -124,6 +141,18 @@ Claude Code의 `.mcp.json`에서 자동으로 연결됩니다:
 | `github_setup_pr_review` | PR 리뷰 환경 셋업 (clone + checkout) |
 | `github_setup_ci_debug` | CI 디버그 환경 셋업 (clone + 로그) |
 
+### Review (7개)
+
+| 도구 | 설명 |
+|------|------|
+| `review_list_pending` | 대기 중인 코드 리뷰 요청 목록 |
+| `review_list_done` | 완료된 리뷰 목록 |
+| `review_list_todo` | agent 작업 문서 목록 |
+| `review_read_todo` | todo 문서 내용 읽기 |
+| `review_create_todo` | pending → agent용 todo 문서 생성 |
+| `review_update_todo` | todo 문서에 리뷰 결과 추가 |
+| `review_mark_done` | 리뷰 완료 처리 (pending → done) |
+
 ### Task (3개)
 
 | 도구 | 설명 |
@@ -131,6 +160,45 @@ Claude Code의 `.mcp.json`에서 자동으로 연결됩니다:
 | `task_list` | 태스크 목록 조회 (소스/상태 필터) |
 | `task_sync` | 외부 소스에서 태스크 동기화 |
 | `task_update` | 태스크 상태 업데이트 |
+
+## 코드 리뷰 자동화
+
+### 아키텍처
+
+```
+Gmail ──(배치 10분)──> review detector ──> data/reviews/pending/*.md
+                                          ↓ (check-reviews skill)
+                                          data/reviews/todo/newjob-*.md
+                                          ↓ (do-review skill + sub-agent)
+                                          리뷰 결과 append → done/ 이동
+```
+
+### 사용법
+
+```bash
+# 1. 신규 리뷰 확인
+/check-reviews
+
+# 2. 리뷰 실행 (sub-agent가 clone → checkout → 분석)
+/do-review
+
+# 3. 특정 리뷰만 실행
+/do-review newjob-owner-repo-42-20260317.md
+```
+
+### 파일 구조
+
+```
+data/reviews/
+  pending/   owner-repo-42-20260317.md      ← 배치가 생성
+  todo/      newjob-owner-repo-42-20260317.md  ← skill이 생성
+  done/      owner-repo-42-20260317.md      ← 완료 시 이동
+```
+
+### 배치 설정
+
+Setup UI (`http://localhost:8919`)에서 watcher 활성화/비활성화, 스캔 주기(1~60분) 설정 가능.
+설정은 `~/.agent-forge/batch-config.json`에 저장.
 
 ## 룰베이스 이메일 처리
 
@@ -172,10 +240,27 @@ Claude Code의 `.mcp.json`에서 자동으로 연결됩니다:
 ## 테스트
 
 ```bash
-uv run python -m pytest -q          # 전체 테스트
-uv run python -m pytest -q -x       # 첫 실패에서 중단
-uv run python -m pytest tests/test_gmail_rules.py -v  # 룰 엔진만
+# 전체 테스트 (기본)
+uv run python -m pytest -q
+
+# 상세 출력 — 각 테스트 이름과 결과 표시
+uv run python -m pytest -v
+
+# 특정 파일만
+uv run python -m pytest tests/test_sanitize.py
+
+# 특정 클래스::메서드
+uv run python -m pytest tests/test_sanitize.py::TestSanitizeEdgeCases::test_token_only_string
+
+# 키워드 필터 (-k)
+uv run python -m pytest -k "bearer"
+
+# 첫 실패에서 중단 (-x) + 실패 테스트만 재실행 (--lf)
+uv run python -m pytest -x
+uv run python -m pytest --lf
 ```
+
+> **참고**: `uv run`은 `.venv` 가상환경 안에서 실행합니다. `python -m pytest`로 호출해야 `src/` 경로가 Python path에 잡힙니다.
 
 ## 디렉토리 구조
 
@@ -206,4 +291,15 @@ src/
     tools.py           MCP 도구 등록 (7개)
     actions/           환경 셋업 (PR 리뷰, CI 디버그)
     monitors/          태스크 동기화 (이슈, PR, CI)
+    review/
+      detector.py      GitHub 리뷰 요청 이메일 감지
+      models.py        ReviewRequest 모델 + 마크다운 생성
+      store.py         파일 저장소 (pending/done/todo)
+      watcher.py       배치 프로세서 (Gmail 스캔 → PR 수집)
+      tools.py         MCP 도구 등록 (7개)
+data/
+  reviews/
+    pending/           신규 리뷰 요청
+    done/              완료된 리뷰
+    todo/              agent 작업 문서
 ```
