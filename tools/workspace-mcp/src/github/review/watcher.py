@@ -14,6 +14,7 @@ from github.review.detector import detect_review_request
 from github.review.models import ReviewRequest
 from github.review.store import ReviewStore
 from gmail.client import GmailClient
+from shared.events import EventDispatcher, ReviewDetected
 
 logger = logging.getLogger(__name__)
 
@@ -28,17 +29,22 @@ class GitHubReviewWatcher:
         gmail_client: GmailClient,
         github_client: GitHubClient,
         store: ReviewStore | None = None,
+        dispatcher: EventDispatcher | None = None,
     ) -> None:
         self._gmail = gmail_client
         self._github = github_client
         self._store = store or ReviewStore()
+        self._dispatcher = dispatcher
 
     @property
     def name(self) -> str:
         return "github_review"
 
-    async def run_once(self) -> None:
-        """Scan Gmail for new review requests, save pending and todo files."""
+    async def run_once(self) -> int:
+        """Scan Gmail for new review requests, save pending and todo files.
+
+        Returns the number of new review requests found.
+        """
         logger.info("Scanning Gmail for review requests...")
 
         emails = await self._gmail.list_messages(query=_GMAIL_QUERY, max_results=20)
@@ -58,6 +64,7 @@ class GitHubReviewWatcher:
                 logger.exception("Unexpected error processing email %s", email_meta.get("id"))
 
         logger.info("Scan complete: %d new review request(s) found", new_count)
+        return new_count
 
     async def _process_email(self, email_meta: dict[str, Any]) -> bool:
         """Process a single email. Returns True if a new review was saved."""
@@ -79,6 +86,17 @@ class GitHubReviewWatcher:
         self._store.save_pending(review)
         self._store.save_todo(review)
         logger.info("New review request + todo: %s#%d", review.repo, review.pr_number)
+
+        if self._dispatcher:
+            await self._dispatcher.dispatch(ReviewDetected(
+                repo=review.repo,
+                pr_number=review.pr_number,
+                pr_title=review.pr_title,
+                pr_url=review.pr_url,
+                requester=review.requester,
+                todo_filename=f"newjob-{review.slug}.md",
+            ))
+
         return True
 
     async def _build_review_request(

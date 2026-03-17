@@ -14,6 +14,8 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
+from shared.events import EventDispatcher, ReviewCompleted, ReviewDetected, BatchCycleFinished
+from shared.hooks import TriggerFileHook
 from shared.task.manager import TaskManager
 from shared.task.store import FileTaskStore
 from shared.types import TaskStatus, TaskType, ToolResult, ToolSource
@@ -42,12 +44,26 @@ class ToolServer:
         self._handlers: dict[str, ToolHandler] = {}
         self._clients: list[Closeable] = []
         self._task_manager = TaskManager(FileTaskStore())
+        self._dispatcher = EventDispatcher()
+        self._trigger_hook = TriggerFileHook()
+        self._register_event_hooks()
         self._register_task_tools()
         self._setup_mcp_handlers()
 
     @property
     def task_manager(self) -> TaskManager:
         return self._task_manager
+
+    @property
+    def dispatcher(self) -> EventDispatcher:
+        return self._dispatcher
+
+    def _register_event_hooks(self) -> None:
+        """Subscribe trigger file hooks to lifecycle events."""
+        self._dispatcher.subscribe(ReviewDetected, self._trigger_hook.on_review_detected)
+        self._dispatcher.subscribe(ReviewCompleted, self._trigger_hook.on_review_completed)
+        self._dispatcher.subscribe(BatchCycleFinished, self._trigger_hook.on_batch_cycle_finished)
+        logger.info("Event hooks registered (%d subscribers)", self._dispatcher.subscriber_count)
 
     def track_client(self, client: Closeable) -> None:
         """Track an API client for cleanup on server shutdown."""
@@ -166,7 +182,7 @@ class ToolServer:
         try:
             from github.review.tools import register as register_review
 
-            register_review(self)
+            register_review(self, dispatcher=self._dispatcher)
         except ImportError:
             logger.warning("Review tools not available")
 
@@ -262,7 +278,7 @@ def _create_batch_scheduler(server: ToolServer):
     try:
         from shared.batch.scheduler import BatchScheduler
 
-        scheduler = BatchScheduler()
+        scheduler = BatchScheduler(dispatcher=server.dispatcher)
         _register_watchers(scheduler, server)
 
         if not scheduler._watchers:
@@ -306,6 +322,7 @@ def _register_watchers(scheduler, server: ToolServer) -> None:
             gmail_client=gmail_client,
             github_client=github_client,
             store=ReviewStore(),
+            dispatcher=server.dispatcher,
         )
         scheduler.register(watcher)
         logger.info("Review watcher registered successfully")

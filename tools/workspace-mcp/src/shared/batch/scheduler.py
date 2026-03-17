@@ -10,26 +10,31 @@ import time
 from typing import Protocol
 
 from shared.batch.config import load_batch_config
+from shared.events import BatchCycleFinished, EventDispatcher
 
 logger = logging.getLogger(__name__)
 
 
 class Watcher(Protocol):
-    """Protocol for batch watchers. Implement `name` and `run_once`."""
+    """Protocol for batch watchers. Implement `name` and `run_once`.
+
+    run_once returns the number of new items found (0 if none).
+    """
 
     @property
     def name(self) -> str: ...
 
-    async def run_once(self) -> None: ...
+    async def run_once(self) -> int: ...
 
 
 class BatchScheduler:
     """Manages multiple watchers, each running on its own interval."""
 
-    def __init__(self) -> None:
+    def __init__(self, dispatcher: EventDispatcher | None = None) -> None:
         self._watchers: list[Watcher] = []
         self._tasks: list[asyncio.Task] = []
         self._running = False
+        self._dispatcher = dispatcher
 
     def register(self, watcher: Watcher) -> None:
         self._watchers.append(watcher)
@@ -73,9 +78,16 @@ class BatchScheduler:
 
             start = time.monotonic()
             try:
-                await watcher.run_once()
+                new_items = await watcher.run_once() or 0
                 elapsed = time.monotonic() - start
-                logger.info("Watcher %s completed in %.2fs", watcher.name, elapsed)
+                logger.info("Watcher %s completed in %.2fs (%d new)", watcher.name, elapsed, new_items)
+
+                if self._dispatcher:
+                    await self._dispatcher.dispatch(BatchCycleFinished(
+                        watcher_name=watcher.name,
+                        new_items=new_items,
+                        elapsed_seconds=round(elapsed, 2),
+                    ))
             except Exception:
                 elapsed = time.monotonic() - start
                 logger.exception("Watcher %s failed after %.2fs", watcher.name, elapsed)

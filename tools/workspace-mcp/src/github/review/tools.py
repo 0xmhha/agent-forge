@@ -1,7 +1,8 @@
 """MCP tools for review request management.
 
 Provides tools to check for new review requests and generate
-agent-friendly todo documents.
+agent-friendly todo documents. Includes trigger-based tools for
+external agent integration.
 """
 
 import logging
@@ -9,15 +10,18 @@ from typing import Any
 
 from github.review.models import ReviewRequest
 from github.review.store import ReviewStore
+from shared.events import EventDispatcher, ReviewCompleted
+from shared.hooks import TriggerFileHook
 from shared.server import ToolServer
 from shared.types import ToolResult
 
 logger = logging.getLogger(__name__)
 
 
-def register(server: ToolServer) -> None:
+def register(server: ToolServer, dispatcher: EventDispatcher | None = None) -> None:
     """Register review management MCP tools."""
     store = ReviewStore()
+    hook = TriggerFileHook()
 
     server.register_tool(
         name="review_list_pending",
@@ -120,7 +124,39 @@ def register(server: ToolServer) -> None:
             },
             "required": ["filename"],
         },
-        handler=_make_mark_done_handler(store),
+        handler=_make_mark_done_handler(store, dispatcher),
+    )
+
+    server.register_tool(
+        name="review_get_next_action",
+        description=(
+            "Get the next pending review action for an agent. "
+            "Returns the oldest trigger or None if no work is queued."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {},
+        },
+        handler=_make_get_next_action_handler(hook),
+    )
+
+    server.register_tool(
+        name="review_acknowledge_action",
+        description=(
+            "Acknowledge a trigger after an agent picks it up. "
+            "Moves the trigger from pending to processed."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "trigger_file": {
+                    "type": "string",
+                    "description": "Trigger filename from review_get_next_action",
+                },
+            },
+            "required": ["trigger_file"],
+        },
+        handler=_make_acknowledge_handler(hook),
     )
 
 
@@ -193,12 +229,40 @@ def _make_create_todo_handler(store: ReviewStore) -> Any:
     return handler
 
 
-def _make_mark_done_handler(store: ReviewStore) -> Any:
-    def handler(*, filename: str, **kwargs: Any) -> ToolResult:
+def _make_mark_done_handler(store: ReviewStore, dispatcher: EventDispatcher | None = None) -> Any:
+    async def handler(*, filename: str, **kwargs: Any) -> ToolResult:
         slug = filename.removesuffix(".md")
-        if store.mark_done(slug):
-            return ToolResult(success=True, data={"message": f"Marked as done: {filename}"})
-        return ToolResult(success=False, error=f"Pending review not found: {filename}")
+        if not store.mark_done(slug):
+            return ToolResult(success=False, error=f"Pending review not found: {filename}")
+
+        repo, pr_number = _parse_slug(slug)
+        if dispatcher and repo:
+            await dispatcher.dispatch(ReviewCompleted(
+                repo=repo,
+                pr_number=pr_number,
+                slug=slug,
+            ))
+
+        return ToolResult(success=True, data={"message": f"Marked as done: {filename}"})
+
+    return handler
+
+
+def _make_get_next_action_handler(hook: TriggerFileHook) -> Any:
+    def handler(**kwargs: Any) -> ToolResult:
+        action = hook.get_next_action()
+        if not action:
+            return ToolResult(success=True, data={"action": None, "message": "No pending actions"})
+        return ToolResult(success=True, data={"action": action})
+
+    return handler
+
+
+def _make_acknowledge_handler(hook: TriggerFileHook) -> Any:
+    def handler(*, trigger_file: str, **kwargs: Any) -> ToolResult:
+        if hook.acknowledge_trigger(trigger_file):
+            return ToolResult(success=True, data={"message": f"Acknowledged: {trigger_file}"})
+        return ToolResult(success=False, error=f"Trigger not found: {trigger_file}")
 
     return handler
 
