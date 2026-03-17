@@ -1,8 +1,11 @@
 """GitHub API client — read-only access, tokens never exposed in responses."""
 
+import logging
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 _GITHUB_API = "https://api.github.com"
 
@@ -148,7 +151,9 @@ class GitHubClient:
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any] | list[dict[str, Any]]:
         """Send authenticated request to GitHub API."""
+        logger.debug("GitHub API: %s %s params=%s", method, url, params)
         response = await self._http.request(method, url, params=params)
+        logger.debug("GitHub API response: %s %d", url, response.status_code)
         response.raise_for_status()
         return response.json()
 

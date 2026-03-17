@@ -6,6 +6,7 @@ background task alongside the MCP server.
 
 import asyncio
 import logging
+import time
 from typing import Protocol
 
 from shared.batch.config import load_batch_config
@@ -66,12 +67,19 @@ class BatchScheduler:
             watcher_config = config.get_watcher(watcher.name)
 
             if not watcher_config.enabled:
+                logger.debug("Watcher %s disabled, sleeping 60s", watcher.name)
                 await asyncio.sleep(60)
                 continue
 
+            start = time.monotonic()
             try:
                 await watcher.run_once()
+                elapsed = time.monotonic() - start
+                logger.info("Watcher %s completed in %.2fs", watcher.name, elapsed)
             except Exception:
-                logger.exception("Watcher %s failed", watcher.name)
+                elapsed = time.monotonic() - start
+                logger.exception("Watcher %s failed after %.2fs", watcher.name, elapsed)
 
-            await asyncio.sleep(watcher_config.interval_minutes * 60)
+            interval = watcher_config.interval_minutes * 60
+            logger.debug("Watcher %s sleeping %ds until next cycle", watcher.name, interval)
+            await asyncio.sleep(interval)
