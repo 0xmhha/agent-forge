@@ -217,6 +217,8 @@ async def run_server() -> None:
 
 def main() -> None:
     """CLI entry point."""
+    from dotenv import load_dotenv
+    load_dotenv()
     logging.basicConfig(level=logging.INFO)
     asyncio.run(run_server())
 

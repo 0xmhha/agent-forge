@@ -13,5 +13,8 @@ tools/*/bin/token-monitor
 .claude/settings.json
 .agent-forge-state/
 
+# Secrets
+.env
+
 # OS
 .DS_Store
