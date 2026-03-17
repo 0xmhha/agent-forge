@@ -16,5 +16,8 @@ tools/*/bin/token-monitor
 # Secrets
 .env
 
+# Runtime data
+tools/workspace-mcp/data/reviews/
+
 # OS
 .DS_Store

@@ -23,6 +23,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from shared.auth.credentials import load_config
 from shared.auth.token_store import StoredToken, TokenStore
+from shared.batch.config import load_batch_config, update_watcher_config
 from shared.types import AuthConfig, ToolSource
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,9 @@ def _render_page(store: TokenStore, message: str = "") -> str:
         """
 
     message_html = f'<div class="message">{message}</div>' if message else ""
+
+    batch_config = load_batch_config()
+    batch_html = _render_batch_settings(batch_config)
 
     return f"""<!DOCTYPE html>
 <html lang="ko">
@@ -212,6 +216,83 @@ def _render_page(store: TokenStore, message: str = "") -> str:
             font-size: 13px;
             color: #8b949e;
         }}
+        .section-title {{
+            font-size: 18px;
+            font-weight: 600;
+            color: #f0f6fc;
+            margin: 32px 0 16px;
+        }}
+        .watcher-row {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #21262d;
+        }}
+        .watcher-name {{
+            flex: 1;
+            font-size: 14px;
+            color: #c9d1d9;
+        }}
+        .watcher-interval {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #8b949e;
+        }}
+        .watcher-interval input {{
+            width: 60px;
+            padding: 4px 8px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            color: #c9d1d9;
+            font-size: 13px;
+            text-align: center;
+        }}
+        .toggle {{
+            position: relative;
+            width: 40px;
+            height: 22px;
+        }}
+        .toggle input {{
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }}
+        .toggle-slider {{
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #30363d;
+            border-radius: 11px;
+            transition: 0.2s;
+        }}
+        .toggle-slider:before {{
+            content: "";
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background: #c9d1d9;
+            border-radius: 50%;
+            transition: 0.2s;
+        }}
+        .toggle input:checked + .toggle-slider {{
+            background: #238636;
+        }}
+        .toggle input:checked + .toggle-slider:before {{
+            transform: translateX(18px);
+        }}
+        .btn-save {{
+            background: #1f6feb;
+            color: #fff;
+            border: none;
+            margin-top: 12px;
+        }}
+        .btn-save:hover {{ background: #388bfd; }}
         .env-hint {{
             margin-top: 12px;
             padding: 10px 12px;
@@ -238,6 +319,7 @@ def _render_page(store: TokenStore, message: str = "") -> str:
         <p class="subtitle">Service Connection Setup</p>
         {message_html}
         {services_html}
+        {batch_html}
         <div class="footer">토큰은 로컬에 암호화되어 저장됩니다 (~/.agent-forge/tokens/)</div>
     </div>
 </body>
@@ -265,6 +347,62 @@ def _get_env_hint(service: str, has_credentials: bool) -> str:
             <span class="unset">GITHUB_CLIENT_ID</span> / <span class="unset">GITHUB_CLIENT_SECRET</span>
         </div>"""
     return ""
+
+
+_WATCHER_LABELS = {
+    "github_review": {"name": "GitHub Review Requests", "icon": "👀"},
+}
+
+
+def _render_batch_settings(batch_config) -> str:
+    """Render the batch watcher settings section."""
+    rows = ""
+    for watcher_name, watcher_cfg in batch_config.watchers.items():
+        label = _WATCHER_LABELS.get(watcher_name, {"name": watcher_name, "icon": "⚙️"})
+        checked = "checked" if watcher_cfg.enabled else ""
+        rows += f"""
+        <div class="watcher-row">
+            <span>{label['icon']}</span>
+            <span class="watcher-name">{label['name']}</span>
+            <div class="watcher-interval">
+                <input type="number" id="interval-{watcher_name}"
+                       value="{watcher_cfg.interval_minutes}" min="1" max="60">
+                <span>분</span>
+            </div>
+            <label class="toggle">
+                <input type="checkbox" id="enabled-{watcher_name}" {checked}
+                       onchange="saveWatcher('{watcher_name}')">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>"""
+
+    return f"""
+    <h2 class="section-title">Batch Watchers</h2>
+    <div class="service-card">
+        {rows}
+        <script>
+        async function saveWatcher(name) {{
+            const enabled = document.getElementById('enabled-' + name).checked;
+            const interval = document.getElementById('interval-' + name).value;
+            const params = new URLSearchParams({{
+                enabled: enabled, interval: interval
+            }});
+            const resp = await fetch('/batch/' + name + '?' + params);
+            if (resp.redirected) window.location = resp.url;
+        }}
+        // Save on interval change (debounced)
+        document.querySelectorAll('.watcher-interval input').forEach(input => {{
+            let timer;
+            input.addEventListener('change', () => {{
+                clearTimeout(timer);
+                timer = setTimeout(() => {{
+                    const name = input.id.replace('interval-', '');
+                    saveWatcher(name);
+                }}, 500);
+            }});
+        }});
+        </script>
+    </div>"""
 
 
 def _build_auth_url(config: AuthConfig, service: str, redirect_uri: str) -> str:
@@ -371,6 +509,17 @@ def create_app() -> FastAPI:
         store.delete(service)
         label = SERVICE_LABELS.get(service, {}).get("name", service)
         return RedirectResponse(f"/?message={label} 연결이 해제되었습니다")
+
+    @app.get("/batch/{watcher_name}")
+    async def update_batch(watcher_name: str, request: Request):
+        enabled = request.query_params.get("enabled", "true") == "true"
+        interval = int(request.query_params.get("interval", "10"))
+        interval = max(1, min(60, interval))
+
+        update_watcher_config(watcher_name, enabled=enabled, interval_minutes=interval)
+        label = _WATCHER_LABELS.get(watcher_name, {}).get("name", watcher_name)
+        status = "활성화" if enabled else "비활성화"
+        return RedirectResponse(f"/?message={label}: {status}, {interval}분 간격")
 
     return app
 
