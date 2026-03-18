@@ -6,26 +6,37 @@ LLM에 토큰이 노출되지 않도록 룰베이스로 동작하며, 결과만 
 ## Quick Start
 
 ```bash
-# 1. 설치
 cd tools/workspace-mcp
-uv sync
 
-# 2. 환경변수 설정
+make install  # 의존성 설치
 cp .env.sample .env
 # .env 파일에 GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET 입력
 
-# 3. OAuth 인증 (최초 1회, 토큰 만료 시 재실행)
-uv run python -m shared.auth.setup
-# → http://localhost:8919 에서 Gmail/GitHub 연결
-
-# 4. MCP 서버 실행 (Claude Code가 자동 연결)
-uv run agent-forge-server
+make setup    # OAuth 인증 (최초 1회)
+make server   # MCP 서버 실행
 ```
 
 > **Setup UI vs MCP 서버**: Setup UI는 OAuth 토큰을 발급·저장하는 인증 도구 (최초 1회).
 > MCP 서버는 저장된 토큰으로 Gmail/GitHub API를 호출하는 도구 서버 (매 세션).
 
-## 설치 (상세)
+## Make 명령어
+
+`make` 또는 `make help`로 전체 명령어를 확인할 수 있다.
+
+| 명령 | 설명 |
+|------|------|
+| `make server` | MCP 서버 실행 |
+| `make debug` | DEBUG 레벨로 MCP 서버 실행 |
+| `make setup` | OAuth 설정 UI (최초 1회) |
+| `make install` | 의존성 설치 |
+| `make test` | 전체 테스트 |
+| `make test-v` | 테스트 (상세 출력) |
+| `make lint` | 코드 린트 |
+| `make fix` | 린트 자동 수정 |
+| `make log` | 실시간 로그 모니터링 (tail -f) |
+| `make log-all` | 전체 로그 보기 |
+| `make status` | 토큰/배치 설정/리뷰 큐 상태 확인 |
+| `make clean` | 캐시/로그 정리 |
 
 ## 초기 설정: Gmail 연동
 
@@ -57,17 +68,14 @@ uv run agent-forge-server
 ### 4. 환경변수 설정
 
 ```bash
-# .env 파일 생성 (tools/workspace-mcp/ 하위)
-cat > .env << 'EOF'
-GMAIL_CLIENT_ID=your-client-id
-GMAIL_CLIENT_SECRET=your-client-secret
-EOF
+cp .env.sample .env
+# .env 파일에 GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET 입력
 ```
 
 ### 5. Setup UI 실행
 
 ```bash
-uv run python -m shared.auth.setup
+make setup
 ```
 
 브라우저가 자동으로 `http://localhost:8919`를 엽니다.
@@ -75,7 +83,7 @@ Gmail "연결하기" 클릭 → Google 로그인 → 동의 → 완료.
 
 토큰은 `~/.agent-forge/tokens/`에 암호화 저장됩니다.
 
-> **테스트 모드 주의**: 토큰이 7일마다 만료됩니다. 만료 시 Setup UI에서 "재연결"을 클릭하세요.
+> **테스트 모드 주의**: 토큰이 7일마다 만료됩니다. 만료 시 `make setup`으로 "재연결"을 클릭하세요.
 
 ## 초기 설정: GitHub 연동
 
@@ -95,12 +103,13 @@ echo 'GITHUB_CLIENT_ID=your-id' >> .env
 echo 'GITHUB_CLIENT_SECRET=your-secret' >> .env
 ```
 
-Setup UI에서 GitHub "연결하기"로 OAuth 인증.
+`make setup`에서 GitHub "연결하기"로 OAuth 인증.
 
 ## MCP 서버 실행
 
 ```bash
-uv run agent-forge-server
+make server       # 기본 실행 (INFO 레벨)
+make debug        # DEBUG 레벨 (API 요청까지 로그)
 ```
 
 Claude Code의 `.mcp.json`에서 자동으로 연결됩니다:
@@ -115,6 +124,23 @@ Claude Code의 `.mcp.json`에서 자동으로 연결됩니다:
     }
   }
 }
+```
+
+## 로깅
+
+`.env`에서 로그 레벨을 설정한다:
+
+```bash
+LOG_LEVEL=INFO    # 기본값 (도구 호출, 배치 사이클)
+LOG_LEVEL=DEBUG   # API 요청/응답까지 모두 기록
+LOG_LEVEL=WARNING # 경고와 에러만
+```
+
+로그 파일: `logs/workspace-mcp.log` (5MB 로테이션, 3개 백업)
+
+```bash
+make log          # 실시간 로그 (tail -f)
+make log-all      # 전체 로그 출력
 ```
 
 ## MCP 도구 목록
@@ -141,7 +167,7 @@ Claude Code의 `.mcp.json`에서 자동으로 연결됩니다:
 | `github_setup_pr_review` | PR 리뷰 환경 셋업 (clone + checkout) |
 | `github_setup_ci_debug` | CI 디버그 환경 셋업 (clone + 로그) |
 
-### Review (7개)
+### Review (9개)
 
 | 도구 | 설명 |
 |------|------|
@@ -152,6 +178,8 @@ Claude Code의 `.mcp.json`에서 자동으로 연결됩니다:
 | `review_create_todo` | pending → agent용 todo 문서 생성 |
 | `review_update_todo` | todo 문서에 리뷰 결과 추가 |
 | `review_mark_done` | 리뷰 완료 처리 (pending → done) |
+| `review_get_next_action` | 다음 대기 작업 조회 (에이전트 폴링용) |
+| `review_acknowledge_action` | 작업 수령 확인 (트리거 → processed 이동) |
 
 ### Task (3개)
 
@@ -167,11 +195,25 @@ Claude Code의 `.mcp.json`에서 자동으로 연결됩니다:
 
 ```
 Gmail ──(배치 10분)──> review detector ──> data/reviews/pending/*.md
-                                          ↓ (check-reviews skill)
-                                          data/reviews/todo/newjob-*.md
-                                          ↓ (do-review skill + sub-agent)
-                                          리뷰 결과 append → done/ 이동
+                                          + data/reviews/todo/newjob-*.md
+                                          + data/triggers/pending/*.json
+                                          ↓
+                       외부 에이전트 ←── review_get_next_action (폴링)
+                                          ↓ (clone → checkout → 분석)
+                       review_mark_done → done/ 이동 + trigger processed
 ```
+
+### 이벤트 시스템
+
+배치 프로세스와 외부 에이전트 간 통신은 이벤트 + 트리거 파일 패턴으로 동작한다:
+
+| 이벤트 | 발생 시점 | 트리거 파일 |
+|--------|-----------|-------------|
+| `ReviewDetected` | 새 리뷰 요청 감지 | `data/triggers/pending/review-{slug}.json` |
+| `ReviewCompleted` | 리뷰 완료 처리 | `data/triggers/processed/review-{slug}.json` |
+| `BatchCycleFinished` | 배치 스캔 완료 (신규 있을 때) | `data/triggers/pending/batch-{name}-{date}.json` |
+
+외부 에이전트는 `review_get_next_action`으로 폴링하고, `review_acknowledge_action`으로 작업 수령을 확인한다.
 
 ### 사용법
 
@@ -189,10 +231,14 @@ Gmail ──(배치 10분)──> review detector ──> data/reviews/pending/*
 ### 파일 구조
 
 ```
-data/reviews/
-  pending/   owner-repo-42-20260317.md      ← 배치가 생성
-  todo/      newjob-owner-repo-42-20260317.md  ← skill이 생성
-  done/      owner-repo-42-20260317.md      ← 완료 시 이동
+data/
+  reviews/
+    pending/   owner-repo-42-20260317.md        ← 배치가 생성
+    todo/      newjob-owner-repo-42-20260317.md  ← 배치가 자동 생성
+    done/      owner-repo-42-20260317.md         ← 완료 시 이동
+  triggers/
+    pending/   review-owner-repo-42.json         ← 이벤트 hook이 생성
+    processed/ review-owner-repo-42.json         ← acknowledge 후 이동
 ```
 
 ### 배치 설정
@@ -240,24 +286,17 @@ Setup UI (`http://localhost:8919`)에서 watcher 활성화/비활성화, 스캔 
 ## 테스트
 
 ```bash
-# 전체 테스트 (기본)
-uv run python -m pytest -q
+make test         # 전체 테스트
+make test-v       # 상세 출력
+```
 
-# 상세 출력 — 각 테스트 이름과 결과 표시
-uv run python -m pytest -v
-
-# 특정 파일만
+개별 테스트:
+```bash
 uv run python -m pytest tests/test_sanitize.py
-
-# 특정 클래스::메서드
 uv run python -m pytest tests/test_sanitize.py::TestSanitizeEdgeCases::test_token_only_string
-
-# 키워드 필터 (-k)
 uv run python -m pytest -k "bearer"
-
-# 첫 실패에서 중단 (-x) + 실패 테스트만 재실행 (--lf)
-uv run python -m pytest -x
-uv run python -m pytest --lf
+uv run python -m pytest -x       # 첫 실패에서 중단
+uv run python -m pytest --lf     # 실패 테스트만 재실행
 ```
 
 > **참고**: `uv run`은 `.venv` 가상환경 안에서 실행합니다. `python -m pytest`로 호출해야 `src/` 경로가 Python path에 잡힙니다.
@@ -270,11 +309,17 @@ src/
     server.py          MCP 서버 코어
     types.py           공유 타입 정의
     sanitize.py        토큰 제거
+    logging.py         로깅 설정 (파일 로테이션 + 컬러 콘솔)
+    events.py          이벤트 디스패처 (ReviewDetected 등)
+    hooks.py           트리거 파일 hook (에이전트 통신)
     auth/
       setup.py         OAuth 설정 웹 UI
       oauth_flow.py    OAuth 2.0 플로우
       token_store.py   암호화 토큰 저장
       credentials.py   환경변수 로딩
+    batch/
+      scheduler.py     배치 스케줄러 (async 백그라운드)
+      config.py        배치 설정 (JSON)
     task/
       manager.py       태스크 CRUD
       store.py         파일 기반 저장
@@ -296,10 +341,15 @@ src/
       models.py        ReviewRequest 모델 + 마크다운 생성
       store.py         파일 저장소 (pending/done/todo)
       watcher.py       배치 프로세서 (Gmail 스캔 → PR 수집)
-      tools.py         MCP 도구 등록 (7개)
+      tools.py         MCP 도구 등록 (9개)
 data/
   reviews/
     pending/           신규 리뷰 요청
     done/              완료된 리뷰
     todo/              agent 작업 문서
+  triggers/
+    pending/           대기 중인 에이전트 트리거
+    processed/         처리 완료된 트리거
+logs/
+  workspace-mcp.log   서버 로그 (5MB 로테이션)
 ```
