@@ -13,7 +13,7 @@ user-invocable: true
 ### Step 1: 변경 사항 수집
 
 ```bash
-!`git diff --stat HEAD~1`
+!`git diff --stat HEAD~1 2>/dev/null || git show --stat HEAD 2>/dev/null || echo "no commits yet"`
 ```
 
 ### Step 2: 마일스톤 번호 결정

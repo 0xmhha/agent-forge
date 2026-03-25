@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "#!/bin/bash\ntier=$(cat .agent-forge-state/tier 2>/dev/null || echo \"none\")\nif [ \"$tier\" != \"none\" ]; then\n  echo '[agent-forge] Session ending. Checklist:' >&2\n  echo '  - delta-log recorded? (/delta-log)' >&2\n  echo '  - rolling-summary updated?' >&2\n  echo '  - token metrics collected? (token_session_export)' >&2\nfi\nrm -rf .agent-forge-state 2>/dev/null"
+            "command": "#!/bin/bash\ntier=$(cat .agent-forge-state/tier 2>/dev/null || echo \"unknown\")\nif [ \"$tier\" != \"unknown\" ]; then\n  echo '[agent-forge] Session ending. Checklist:' >&2\n  echo '  - delta-log recorded? (/delta-log)' >&2\n  echo '  - rolling-summary updated?' >&2\n  echo '  - token metrics collected? (token_session_export)' >&2\n  echo '  - handoff.md generated? (/handoff)' >&2\nfi"
           }
         ]
       }

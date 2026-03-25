@@ -36,9 +36,14 @@ ELSE:
 
 ### Step 3: Tier 기록
 
+tier 값은 반드시 소문자로 기록한다: `micro`, `standard`, `full`
+
 ```bash
 !`mkdir -p .agent-forge-state && echo "{tier}" > .agent-forge-state/tier && echo "Tier set: {tier}"`
 ```
+
+> **중요**: `.agent-forge-state/tier` 에 기록하는 값은 반드시 소문자여야 한다.
+> hooks가 `micro`, `standard`, `full` 소문자로 비교하기 때문이다.
 
 ### Step 4: Tier별 출력
 

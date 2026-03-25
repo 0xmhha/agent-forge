@@ -100,13 +100,14 @@ flowchart TD
 
 - **agent-pattern 매핑**: 단일 에이전트 시스템 (Section 3)
 
-### 2.5 코디네이터 패턴 (부분 적용) — `/milestone`
+### 2.5 코디네이터 패턴 — `/milestone`
 
-`/milestone`이 여러 스킬을 순서대로 호출하는 코디네이터 역할을 수행한다.
-다만 현재는 **정적 라우팅**(고정 순서)이므로 완전한 코디네이터 패턴은 아니다.
+`/milestone`이 여러 스킬을 Tier에 따라 **동적으로 라우팅**하는 코디네이터 역할을 수행한다.
 
-- 동적 라우팅이 추가되면 (예: Micro Tier는 QR 건너뛰기) 완전한 코디네이터 패턴이 된다
-- **agent-pattern 매핑**: 코디네이터 패턴 (Section 4.6, 부분 적용)
+- Micro Tier: QR과 handoff를 건너뛰는 fast-path
+- Standard Tier: QR 1회 + handoff 생성
+- Full Tier: 마일스톤별 QR + 마일스톤 진행 현황 포함 handoff
+- **agent-pattern 매핑**: 코디네이터 패턴 (Section 4.6, 완전 적용)
 
 ---
 
@@ -155,7 +156,7 @@ flowchart TD
 | **Plan Mode** | 탐색과 실행 분리 | Standard/Full Tier 계획 단계 | 구현됨 |
 | **Approval** | 위험 작업 전 인간 승인 | QR Gate 체크포인트 | 구현됨 |
 | **AskUserQuestion** | 구조화된 질문으로 요구사항 수집 | (미적용) | 확장 가능 |
-| **Skills** | 반복 작업 절차 패키지 | dist/skills/ (6개) | 구현됨 |
+| **Skills** | 반복 작업 절차 패키지 | dist/skills/ (7개) | 구현됨 |
 | **Hooks** | 자동 개입 규칙 | pre-commit QR, session-end checklist | 구현됨 |
 | **Plugins** | 역할 패키지 (skills+hooks+MCP 묶음) | dist/ 전체가 plugin 역할 | 구조 존재 |
 | **MCP** | 외부 도구 연결 규격 | workspace-mcp(24 tools), token-monitor-mcp(5 tools) | 구현됨 |
@@ -182,25 +183,27 @@ flowchart TD
 
 **우선순위: 높음** | **구현 난이도: 낮음** | **효과: 지연 시간 50% 감소**
 
-현재 `/check-reviews`는 Gmail 스캔과 GitHub PR 수집을 순차적으로 처리한다.
-두 작업은 독립적이므로 병렬 실행이 가능하다.
+`/check-reviews`는 리뷰 관련 3개 MCP 도구를 병렬로 호출하여 현재 상태를 수집한다.
 
 ```mermaid
 flowchart TD
-    CR["/check-reviews"] --> G["Gmail 스캔 에이전트<br/>(리뷰 요청 메일 탐지)"]
-    CR --> GH["GitHub PR 수집 에이전트<br/>(review_requested 필터)"]
-    G --> AGG["결과 종합"]
-    GH --> AGG
-    AGG --> TODO["todo 문서 생성"]
+    CR["/check-reviews"] --> P["review_list_pending<br/>(대기 중 리뷰)"]
+    CR --> T["review_list_todo<br/>(작업 문서)"]
+    CR --> D["review_list_done<br/>(완료 리뷰)"]
+    P --> AGG["결과 종합"]
+    T --> AGG
+    D --> AGG
+    AGG --> TODO["신규 todo 생성"]
 
     style CR fill:#F9AB00,color:#000
-    style G fill:#4285F4,color:#fff
-    style GH fill:#4285F4,color:#fff
+    style P fill:#4285F4,color:#fff
+    style T fill:#4285F4,color:#fff
+    style D fill:#4285F4,color:#fff
     style AGG fill:#34A853,color:#fff
 ```
 
-workspace-mcp의 `gmail_search`와 `github_list_prs`가 이미 독립 MCP 도구로 존재하므로,
-병렬 호출만으로 구현 가능하다.
+3개 MCP 도구는 서로 독립적이므로 반드시 동시에 호출한다.
+Gmail 스캔 → GitHub PR 수집은 workspace-mcp의 batch watcher가 백그라운드에서 자동 처리한다.
 
 ### 4.2 반복적 개선 패턴 — QR 자동 수정 루프
 

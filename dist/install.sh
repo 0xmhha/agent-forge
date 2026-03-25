@@ -27,13 +27,13 @@ echo "Mode:   ${MODE:-local}"
 echo ""
 
 # --- Determine skill set ---
-CORE_SKILLS="complexity qr-gate delta-log milestone"
+CORE_SKILLS="complexity qr-gate delta-log milestone handoff"
 REVIEW_SKILLS="check-reviews do-review"
 
 if [ "$MODE" = "--full" ]; then
   ALL_SKILLS="$CORE_SKILLS $REVIEW_SKILLS"
   SKILLS_DIR="$TARGET/.claude/skills"
-  echo "[1/5] Installing all skills (core + review) to project"
+  echo "[1/5] Installing all skills (core + review: 7 skills) to project"
 elif [ "$MODE" = "--global" ]; then
   ALL_SKILLS="$CORE_SKILLS"
   SKILLS_DIR="$HOME/.claude/skills"

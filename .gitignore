@@ -21,7 +21,7 @@ handoff.md
 
 # External reference docs (too large for repo)
 docs/claude-guide.md
-docs/claude-guide/
+#docs/claude-guide/
 
 # Secrets
 .env
