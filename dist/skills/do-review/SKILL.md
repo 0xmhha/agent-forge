@@ -1,8 +1,9 @@
 ---
 name: do-review
 description: |
-  todo 폴더의 코드 리뷰 작업을 sub-agent로 실행한다.
-  PR을 clone/checkout하고, 변경사항을 분석하여 리뷰 결과를 생성한다.
+  todo 폴더의 코드 리뷰 작업을 code-reviewer sub-agent로 실행한다.
+  PR을 clone/checkout하고, 정확성/보안/성능/스타일/테스트 관점에서 분석한다.
+  /check-reviews로 먼저 todo를 준비한 후 실행. workspace-mcp 서버 연결 필수.
 trigger-keywords: do-review, 리뷰 실행, start review, run review
 user-invocable: true
 ---

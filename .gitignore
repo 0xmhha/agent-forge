@@ -1,9 +1,14 @@
 # Python
 __pycache__/
 *.pyc
+*.pyo
 *.egg-info/
 .venv/
 .pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
 
 # Binaries
 tools/*/bin/token-monitor
@@ -12,6 +17,11 @@ tools/*/bin/token-monitor
 .claude/skills/
 .claude/settings.json
 .agent-forge-state/
+handoff.md
+
+# External reference docs (too large for repo)
+docs/claude-guide.md
+docs/claude-guide/
 
 # Secrets
 .env
@@ -20,6 +30,18 @@ tools/*/bin/token-monitor
 tools/workspace-mcp/data/reviews/
 tools/workspace-mcp/data/triggers/
 tools/workspace-mcp/logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
+._*
+Thumbs.db
+
+.claude/settings.local.json

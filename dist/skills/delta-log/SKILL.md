@@ -1,9 +1,10 @@
 ---
 name: delta-log
 description: |
-  마일스톤 완료 시 delta-log 엔트리를 생성하고 rolling-summary를 갱신한다.
+  마일스톤 완료 시 delta-log 엔트리(M{N}-{slug}.json)를 생성하고 rolling-summary를 갱신한다.
   작업 완료 후 컨텍스트를 구조적으로 기록하여 다음 세션에서 활용한다.
-trigger-keywords: delta, 델타, log, 기록
+  /milestone 워크플로우의 일부로 자동 호출되거나, 독립적으로 수동 호출 가능.
+trigger-keywords: delta, 델타, log, 기록, delta-log
 user-invocable: true
 ---
 

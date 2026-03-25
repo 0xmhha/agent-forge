@@ -3,7 +3,9 @@ name: qr-gate
 description: |
   Quality Review 게이트를 실행한다. 커밋 전에 코드 품질을 검증하는 핵심 단계.
   Standard/Full tier에서 필수. Micro에서는 선택.
-trigger-keywords: qr, quality review, 리뷰, 검토, 코드리뷰
+  MUST/SHOULD/COULD 3단계 심각도, domain-profile 연동, 이중 경로 검증.
+  NEEDS_CHANGES 시 자동 수정 루프(최대 2회) 후 수동 전환.
+trigger-keywords: qr, quality review, 품질 검증, 코드 검토
 user-invocable: true
 ---
 
@@ -17,6 +19,12 @@ user-invocable: true
 
 ```bash
 !`git diff --stat`
+```
+
+4. 현재 반복 횟수 확인:
+
+```bash
+!`cat .agent-forge-state/qr-iteration 2>/dev/null || echo "1"`
 ```
 
 ### Step 2: 도메인 프로필 체크리스트 생성
@@ -45,6 +53,14 @@ domain-profile.yaml이 프로젝트에 있으면:
 - **COULD**: "린터/포매터로 자동 수정 가능한가?" → COULD
   - DEAD_CODE, FORMATTER_FIXABLE
 
+**반복별 디에스컬레이션 (iteration-based de-escalation):**
+
+| 반복 | 차단 수준 | 설명 |
+|------|-----------|------|
+| 1-2회 | MUST + SHOULD + COULD | 모든 심각도 보고 |
+| 3-4회 | MUST + SHOULD | COULD 자동 무시 |
+| 5+회 | MUST only | MUST만 차단 |
+
 ### Step 5: 이중 경로 검증 (MUST에만)
 
 - 경로 A: "이것이 문제인 이유는?"
@@ -55,6 +71,7 @@ domain-profile.yaml이 프로젝트에 있으면:
 
 ```
 VERDICT: [PASS | PASS_WITH_CONCERNS | NEEDS_CHANGES]
+ITERATION: {N}/2 (auto-fix) 또는 {N} (manual)
 
 FINDINGS:
 ### [CATEGORY SEVERITY]: Title
@@ -66,10 +83,62 @@ FINDINGS:
 REASONING: [max 30 words]
 ```
 
-### Step 7: QR 완료 기록
+### Step 7: 자동 수정 루프 (NEEDS_CHANGES인 경우)
+
+NEEDS_CHANGES 판정이 나오면 자동 수정 루프를 실행한다.
+
+**자동 수정 조건:**
+- 현재 반복 횟수 ≤ 2
+- MUST 또는 SHOULD finding이 존재
+
+**자동 수정 절차:**
+
+1. FINDINGS를 구조화된 수정 지시로 변환:
+   ```
+   각 finding에 대해:
+   - 파일: {file}:{line}
+   - 문제: {issue}
+   - 수정 방법: {fix action}
+   ```
+
+2. 수정 실행:
+   - 각 finding의 Fix 항목에 따라 코드를 직접 수정
+   - COULD 항목은 자동 수정 시 무시 (린터/포매터 영역)
+   - 수정 시 기존 코드 스타일과 패턴을 유지
+
+3. 반복 횟수 기록:
+   ```bash
+   !`mkdir -p .agent-forge-state && echo "{N+1}" > .agent-forge-state/qr-iteration`
+   ```
+
+4. Step 1로 돌아가 재검사 실행
+
+**수동 전환 조건 (반복 횟수 > 2):**
+
+```
+## QR Auto-Fix Limit Reached
+
+자동 수정을 2회 시도했으나 여전히 NEEDS_CHANGES입니다.
+
+### 남은 Finding:
+{미해결 findings 목록}
+
+### 수정 이력:
+- Iteration 1: {수정한 항목}
+- Iteration 2: {수정한 항목}
+
+수동으로 남은 이슈를 수정한 후 `/qr-gate`를 다시 실행해주세요.
+```
+
+### Step 8: QR 완료 기록
+
+PASS 또는 PASS_WITH_CONCERNS인 경우:
 
 ```bash
 !`mkdir -p .agent-forge-state && echo "yes" > .agent-forge-state/qr-done && echo "QR gate completed"`
 ```
 
-NEEDS_CHANGES이면 문제를 수정한 후 다시 /qr-gate를 실행한다.
+반복 카운터 리셋:
+```bash
+!`rm -f .agent-forge-state/qr-iteration`
+```

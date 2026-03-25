@@ -8,24 +8,25 @@
 
 1. **작업 시작** → `/complexity`로 Tier 판정
 2. **코딩** → 작업 수행
-3. **완료** → `/milestone`로 일괄 처리 (QR → delta-log → 토큰 → 커밋)
+3. **완료** → `/milestone`로 일괄 처리 (QR → delta-log → handoff → 토큰 → 커밋)
 
 ### Tier 분기
 
 | Tier | 파일 수 | 절차 |
 |------|---------|------|
 | Micro | 1-2 | 직접 실행 → 커밋 |
-| Standard | 3-10 | 계획 → 실행 → QR 1회 → 커밋 |
-| Full | 10+ | 계획 → 마일스톤별 (실행 → QR) → 커밋 |
+| Standard | 3-10 | 계획 → 실행 → QR 1회 → handoff → 커밋 |
+| Full | 10+ | 마일스톤 분해 → 마일스톤별 (실행 → QR) → handoff → 커밋 |
 
 ### 사용 가능한 명령
 
 | 명령 | 용도 |
 |------|------|
-| `/complexity` | 복잡도 평가, Tier 추천 |
-| `/qr-gate` | Quality Review (커밋 전 필수, Micro 제외) |
+| `/complexity` | 복잡도 평가, Tier 추천, Full시 마일스톤 자동 분해 |
+| `/qr-gate` | Quality Review (자동 수정 루프 포함, 최대 2회) |
 | `/delta-log` | delta-log 엔트리 + rolling-summary 생성 |
 | `/milestone` | 전체 완료 워크플로우 일괄 실행 |
+| `/handoff` | 세션 인수인계 문서 생성 |
 
 ### 커밋 규칙
 

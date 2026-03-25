@@ -1,29 +1,41 @@
 ---
 name: check-reviews
 description: |
-  MCP 서버에서 신규 코드 리뷰 요청을 확인하고, 대기 중인 리뷰를 정리한다.
-  신규 요청이 있으면 todo 문서를 생성하여 작업 준비를 완료한다.
+  workspace-mcp를 통해 Gmail과 GitHub에서 신규 코드 리뷰 요청을 병렬 수집한다.
+  대기 중인 리뷰를 정리하고, 신규 요청에 대해 todo 문서를 자동 생성한다.
+  workspace-mcp 서버 연결 필수.
 trigger-keywords: check-reviews, 리뷰 확인, review check, pending reviews
 user-invocable: true
 ---
 
 ## Instructions
 
-신규 코드 리뷰 요청을 확인하고 작업 문서를 준비한다.
+신규 코드 리뷰 요청을 병렬로 수집하고 작업 문서를 준비한다.
 
-### Step 1: 대기 중인 리뷰 확인
+### Step 1: 병렬 데이터 수집
 
-MCP 도구 `review_list_pending`을 호출하여 신규 리뷰 요청 목록을 가져온다.
+다음 3개의 MCP 도구를 **동시에** 호출한다 (병렬 실행):
 
-결과가 비어 있으면:
+| 호출 | MCP 도구 | 목적 |
+|------|----------|------|
+| A | `review_list_pending` | 이미 감지된 대기 중인 리뷰 목록 |
+| B | `review_list_todo` | 이미 생성된 todo 문서 목록 |
+| C | `review_list_done` | 완료된 리뷰 목록 (통계용) |
+
+> **병렬 실행 원칙**: A, B, C는 서로 독립적이므로 반드시 동시에 호출한다.
+> 순차 호출은 불필요한 지연을 발생시킨다.
+
+### Step 2: 결과 종합
+
+병렬 호출 결과를 종합한다:
+- pending 목록에서 아직 todo가 없는 항목을 식별
+- 이미 todo가 있는 항목은 건너뜀
+
+pending이 비어 있으면:
 ```
 신규 코드 리뷰 요청이 없습니다.
 ```
 출력 후 종료한다.
-
-### Step 2: 기존 todo 확인
-
-MCP 도구 `review_list_todo`를 호출하여 이미 생성된 todo 문서 목록을 가져온다.
 
 ### Step 3: 신규 요청에 대해 todo 생성
 
@@ -31,7 +43,7 @@ pending 목록에서 아직 todo가 없는 항목을 찾아 `review_create_todo`
 
 각 todo 생성 시 출력:
 ```
-📋 새 리뷰 작업 생성: {repo}#{pr_number}
+새 리뷰 작업 생성: {repo}#{pr_number}
    파일: {todo_filename}
 ```
 
