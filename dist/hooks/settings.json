@@ -9,6 +9,15 @@
             "command": "#!/bin/bash\ninput=$(cat)\ntier=$(cat .agent-forge-state/tier 2>/dev/null || echo \"unknown\")\nif [ \"$tier\" != \"micro\" ] && [ \"$tier\" != \"unknown\" ]; then\n  qr_done=$(cat .agent-forge-state/qr-done 2>/dev/null || echo \"no\")\n  if [ \"$qr_done\" != \"yes\" ]; then\n    echo '[agent-forge] QR gate not executed. Run /qr-gate or /milestone before committing.' >&2\n  fi\nfi\necho \"$input\""
           }
         ]
+      },
+      {
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"gh pr review\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "#!/bin/bash\ninput=$(cat)\ncommand=$(echo \"$input\" | jq -r '.tool_input.command // empty' 2>/dev/null || echo \"$input\")\npr_number=$(echo \"$command\" | grep -oE '[0-9]+' | head -1)\nrepo=$(echo \"$command\" | grep -oE '--repo [^ ]+' | sed 's/--repo //')\nsafe_name=\"${repo##*/}-pr-${pr_number}\"\nreview_file=\".agent-forge-state/reviews/${safe_name}.json\"\nif [ ! -f \"$review_file\" ] 2>/dev/null; then\n  echo '[agent-forge] No review record found. Run /pr-review first for a thorough review.' >&2\nfi\necho \"$input\""
+          }
+        ]
       }
     ],
     "Stop": [
@@ -17,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "#!/bin/bash\ntier=$(cat .agent-forge-state/tier 2>/dev/null || echo \"unknown\")\nif [ \"$tier\" != \"unknown\" ]; then\n  echo '[agent-forge] Session ending. Checklist:' >&2\n  echo '  - delta-log recorded? (/delta-log)' >&2\n  echo '  - rolling-summary updated?' >&2\n  echo '  - token metrics collected? (token_session_export)' >&2\n  echo '  - handoff.md generated? (/handoff)' >&2\nfi"
+            "command": "#!/bin/bash\ntier=$(cat .agent-forge-state/tier 2>/dev/null || echo \"unknown\")\nif [ \"$tier\" != \"unknown\" ]; then\n  echo '[agent-forge] Session ending. Checklist:' >&2\n  echo '  - delta-log recorded? (/delta-log)' >&2\n  echo '  - rolling-summary updated?' >&2\n  echo '  - token metrics collected? (token_session_export)' >&2\n  echo '  - handoff.md generated? (/handoff)' >&2\nfi\n# pending review reminder\npending=$(ls .agent-forge-state/reviews/*.json 2>/dev/null | wc -l | tr -d ' ')\nif [ \"$pending\" -gt 0 ] 2>/dev/null; then\n  echo \"[agent-forge] Pending reviews: ${pending} PR(s) reviewed this session.\" >&2\nfi"
           }
         ]
       }

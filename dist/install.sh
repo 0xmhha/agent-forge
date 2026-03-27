@@ -28,20 +28,28 @@ echo ""
 
 # --- Determine skill set ---
 CORE_SKILLS="complexity qr-gate delta-log milestone handoff"
-REVIEW_SKILLS="check-reviews do-review"
+REVIEW_SKILLS="check-reviews do-review pr-review"
+CORE_AGENTS=""
+REVIEW_AGENTS="pr-reviewer"
 
 if [ "$MODE" = "--full" ]; then
   ALL_SKILLS="$CORE_SKILLS $REVIEW_SKILLS"
+  ALL_AGENTS="$CORE_AGENTS $REVIEW_AGENTS"
   SKILLS_DIR="$TARGET/.claude/skills"
-  echo "[1/5] Installing all skills (core + review: 7 skills) to project"
+  AGENTS_DIR="$TARGET/.claude/agents"
+  echo "[1/6] Installing all skills (core + review) to project"
 elif [ "$MODE" = "--global" ]; then
   ALL_SKILLS="$CORE_SKILLS"
+  ALL_AGENTS="$CORE_AGENTS"
   SKILLS_DIR="$HOME/.claude/skills"
-  echo "[1/5] Installing core skills globally to $SKILLS_DIR"
+  AGENTS_DIR="$HOME/.claude/agents"
+  echo "[1/6] Installing core skills globally to $SKILLS_DIR"
 else
   ALL_SKILLS="$CORE_SKILLS"
+  ALL_AGENTS="$CORE_AGENTS"
   SKILLS_DIR="$TARGET/.claude/skills"
-  echo "[1/5] Installing core skills to project"
+  AGENTS_DIR="$TARGET/.claude/agents"
+  echo "[1/6] Installing core skills to project"
 fi
 
 # --- Skills ---
@@ -56,9 +64,26 @@ for skill in $ALL_SKILLS; do
   fi
 done
 
+# --- Agents ---
+echo ""
+echo "[2/6] Installing agents"
+if [ -n "$ALL_AGENTS" ]; then
+  mkdir -p "$AGENTS_DIR"
+  for agent in $ALL_AGENTS; do
+    if [ -f "$SCRIPT_DIR/agents/$agent.md" ]; then
+      cp "$SCRIPT_DIR/agents/$agent.md" "$AGENTS_DIR/$agent.md"
+      echo "  + $agent"
+    else
+      echo "  ! $agent (not found, skipping)"
+    fi
+  done
+else
+  echo "  (no agents in this mode)"
+fi
+
 # --- Hooks ---
 echo ""
-echo "[2/5] Installing hooks"
+echo "[3/6] Installing hooks"
 HOOKS_TARGET="$TARGET/.claude/settings.json"
 if [ -f "$HOOKS_TARGET" ]; then
   echo "  ! settings.json already exists. Skipping hooks."
@@ -72,13 +97,13 @@ fi
 
 # --- delta-logs directory ---
 echo ""
-echo "[3/5] Creating delta-logs directory"
+echo "[4/6] Creating delta-logs directory"
 mkdir -p "$TARGET/delta-logs"
 echo "  + delta-logs/"
 
 # --- CLAUDE.md ---
 echo ""
-echo "[4/5] Installing CLAUDE.md template"
+echo "[5/6] Installing CLAUDE.md template"
 if [ -f "$TARGET/CLAUDE.md" ]; then
   echo "  ! CLAUDE.md already exists. Skipping."
   echo "    Template: $SCRIPT_DIR/templates/CLAUDE.md.template"
@@ -89,7 +114,7 @@ fi
 
 # --- Completion & Onboarding Guide ---
 echo ""
-echo "[5/5] Installation complete"
+echo "[6/6] Installation complete"
 echo ""
 echo "========================================"
 echo " Onboarding Guide"
@@ -139,6 +164,10 @@ if [ "$MODE" = "--full" ]; then
 echo "  Review (--full mode):"
 echo "    /check-reviews — 신규 코드 리뷰 요청 확인"
 echo "    /do-review     — 코드 리뷰 sub-agent 실행"
+echo "    /pr-review     — PR 클론 + 프로젝트별 분석 도구 자동 리뷰"
+echo ""
+echo "  Agents:"
+echo "    pr-reviewer    — PR 코드 리뷰 서브 에이전트"
 echo ""
 fi
 echo "  Workflow: /complexity → coding → /milestone"
