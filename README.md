@@ -1,195 +1,262 @@
 # Agent Forge
 
-LLM 에이전트 기반 소프트웨어 개발을 위한 프로세스 프레임워크.
+A methodology framework and session runtime for LLM-based software development.
 
-도구(tool)가 아닌 **방법론(methodology)**에 집중한다.
-에이전트가 코드를 더 빠르게 생성하는 것이 아니라,
-**지속 가능한 품질로 코드를 생성**하는 체계를 구축한다.
+Agent Forge has two components:
 
-## 문제 정의
+- **Methodology** — Claude Code skills that enforce plan-execute-review workflows with quality gates
+- **Runtime** (`forge`) — A Go CLI/TUI that manages isolated Claude Code sessions with sandboxing, monitoring, and background execution
 
-LLM 기반 개발에서 반복적으로 관찰되는 실패 패턴:
+## Quick Start
 
-1. **기술 부채의 보이지 않는 축적** — LLM은 자신이 만든 중복, God Function, 불일치를 감지하지 못한다
-2. **컨텍스트 분산** — 코드가 누적될수록 검토량은 증가하지만, 토큰 예산은 고정이다
-3. **도메인 무관심** — 범용 에이전트는 금융의 규정 준수와 게임의 성능 최적화를 구분하지 못한다
-4. **측정 부재** — 어떤 접근이 효과적인지 정량적으로 알 수 없다
+### Methodology Skills (for any Claude Code project)
 
-## 접근 방식
+```bash
+# Install core skills to your project
+./dist/install.sh /path/to/your-project
 
-기존 운영 환경(SuperClaude)을 유지하면서, 부족한 레이어를 추가한다:
+# Include review skills (Gmail + GitHub integration)
+./dist/install.sh /path/to/your-project --full
 
-| 레이어 | 구현 상태 | 목적 |
-|--------|:---------:|------|
-| 프로세스 모델 | **완료** | 계획-실행-검증의 구조적 분리 (Tier 분기, QR Gate) |
-| 도메인 프로필 | **완료** | 프로젝트별 우선순위/규약 커스터마이징 (YAML 스키마) |
-| 컨텍스트 관리 | **완료** | 토큰 효율적 누적 지식 관리 (delta-log, rolling-summary) |
-| 측정 파이프라인 | **설계 완료** | 비용/품질 정량 분석 (데이터 수집 대기) |
-
-## 핵심 워크플로우
-
-```
-/complexity → 코딩 → /milestone
+# Global install (applies to all projects)
+./dist/install.sh /path/to/your-project --global
 ```
 
-| Tier | 파일 수 | 절차 |
-|------|---------|------|
-| Micro | 1-2 | 직접 실행 → 커밋 |
-| Standard | 3-10 | 계획 → 실행 → QR 1회 → handoff → 커밋 |
-| Full | 10+ | 마일스톤 자동 분해 → 마일스톤별 (실행 → QR) → handoff → 커밋 |
+After installation, use the workflow in Claude Code:
 
-## 적용된 에이전트 패턴
+```
+/complexity    →  assess task, pick tier  →  code  →  /milestone
+```
 
-| 패턴 | 구현체 | 설명 |
-|------|--------|------|
-| 순차 (Sequential) | `/milestone` | QR → delta-log → handoff → 토큰 → 커밋 |
-| 리뷰/비판 (Review & Critique) | `/qr-gate` | MUST/SHOULD/COULD + 자동 수정 루프 (최대 2회) |
-| 인간 참여형 (Human-in-the-Loop) | Tier 분기 | Standard/Full에서 계획 확인 후 실행 |
-| 코디네이터 (Coordinator) | `/milestone` | Tier별 동적 라우팅 |
-| 병렬 (Parallel) | `/check-reviews` | pending + todo + done 병렬 MCP 호출 |
-| 반복적 개선 (Iterative) | `/qr-gate` | 자동 수정 루프 + 반복별 디에스컬레이션 |
-| 계층적 분해 (Hierarchical) | `/complexity` | Full Tier 자동 마일스톤 분해 + Wave 실행 |
+### Runtime (forge CLI)
 
-상세 분석: [docs/pattern-analysis.md](docs/pattern-analysis.md)
+```bash
+# Build
+cd runtime && go build -o forge ./cmd/forge
 
-## 사용 가능한 명령
+# Launch TUI
+./forge
 
-### Core Skills (기본 설치)
+# Or use CLI commands
+./forge new "refactor auth" --task "Refactor auth middleware" --policy restricted
+./forge start refactor
+./forge list
+./forge attach refactor
+```
 
-| 명령 | 용도 |
-|------|------|
-| `/complexity` | 복잡도 평가, Tier 추천, Full시 마일스톤 자동 분해 |
-| `/qr-gate` | Quality Review (자동 수정 루프 포함, 최대 2회) |
-| `/delta-log` | delta-log 엔트리 + rolling-summary 생성 |
-| `/milestone` | 전체 완료 워크플로우 일괄 실행 (handoff 포함) |
-| `/handoff` | 세션 인수인계 문서 생성 |
+## Methodology
 
-### Review Skills (`--full` 설치 시)
+### Workflow Tiers
 
-| 명령 | 용도 |
-|------|------|
-| `/check-reviews` | Gmail + GitHub에서 신규 코드 리뷰 요청 병렬 수집 |
-| `/do-review` | code-reviewer sub-agent로 코드 리뷰 실행 |
+Every task starts with `/complexity` to determine the appropriate verification level:
 
-## MCP 도구 플랫폼
+| Tier | Files | Process |
+|------|-------|---------|
+| **Micro** | 1-2 | Execute directly, commit |
+| **Standard** | 3-10 | Plan → Execute → QR gate → Handoff → Commit |
+| **Full** | 10+ | Auto-decompose into milestones → Per-milestone (Execute → QR) → Handoff → Commit |
+
+### Skills
+
+| Command | Purpose |
+|---------|---------|
+| `/complexity` | Assess complexity, recommend tier, auto-decompose for Full tier |
+| `/qr-gate` | Quality review with auto-fix loop (MUST/SHOULD/COULD severity, max 2 iterations) |
+| `/delta-log` | Record milestone context (delta entry + rolling summary) |
+| `/milestone` | Run complete workflow: QR → delta-log → handoff → token collection → commit |
+| `/handoff` | Generate session handoff document for context transfer |
+
+Review skills (installed with `--full`):
+
+| Command | Purpose |
+|---------|---------|
+| `/check-reviews` | Collect pending reviews from Gmail + GitHub in parallel |
+| `/do-review` | Execute code review via sub-agent |
+
+### Methodology Phases
+
+The methodology is built in four layers, each adding capabilities on top of the previous:
+
+```
+Phase 1: Process Model ──────── Done
+         QR gates, temporal rules, workflow tiers, convention layers
+
+Phase 2: Domain Profiles ────── Done
+         YAML schema, 3 example profiles (fintech, game-dev, startup-mvp)
+
+Phase 3: Context Management ─── Done
+         delta-log system, rolling-summary, merge rules
+
+Phase 4: Measurement ────────── Design complete (awaiting data collection)
+         17 metrics, collection guide, analysis playbook
+```
+
+## Runtime (`forge`)
+
+The runtime manages Claude Code sessions in isolated tmux environments with security policies, resource monitoring, and a TUI dashboard.
+
+### Requirements
+
+- Go 1.24+
+- tmux 3.0+
+- Claude CLI
+
+### Build
+
+```bash
+cd runtime
+go build -o forge ./cmd/forge
+```
+
+### CLI Commands
+
+```bash
+# Session management
+forge new <title> [flags]       # Create a new session
+  --task "description"          #   Task for the AI
+  --policy restricted           #   Security policy: readonly/restricted/standard/full
+  --project /path/to/project    #   Target project path
+  --budget 50000                #   Token budget (0 = unlimited)
+forge start <id|title>          # Start session (launch Claude Code in tmux)
+forge list                      # List all sessions
+forge status [id|title]         # Show status and metrics
+forge attach <id|title>         # Interactive terminal connection
+forge pause <id|title>          # Pause a running session
+forge resume <id|title>         # Resume a paused session
+forge kill <id|title>           # Terminate and clean up
+forge log <id|title>            # Show session output
+
+# TUI
+forge                           # Launch interactive TUI (default)
+
+# Background daemon
+forge daemon start              # Start background session monitor
+forge daemon stop               # Stop daemon
+forge daemon status             # Check daemon status
+
+# Configuration
+forge config                    # Show current configuration
+forge version                   # Print version
+```
+
+### Security Policies
+
+Each session runs in a sandbox with a security policy that controls which Claude Code tools are allowed:
+
+| Preset | Allowed Tools | Use Case |
+|--------|--------------|----------|
+| `readonly` | Read, Glob, Grep | Analysis without modifications |
+| `restricted` | + Write, Edit | Limited writes, no shell |
+| `standard` | + Bash (npm test, go test, git diff) | General development |
+| `full` | All tools including Bash, Agent | Trusted tasks |
+
+### Session Lifecycle
+
+```
+Creating → Running ⇄ Waiting → Completed
+              ↓          ↓
+           Paused ←──────┘      Failed
+```
+
+- **Creating**: Sandbox configured, waiting for `start`
+- **Running**: Claude Code actively working
+- **Waiting**: Claude Code awaiting user input
+- **Paused**: Terminal detached, sandbox preserved
+- **Completed/Failed**: Terminal state
+
+### TUI Key Bindings
+
+```
+↑/k          Previous session          n        New session
+↓/j          Next session              p        Pause
+Enter/o      Attach (interactive)      r        Resume
+Tab          Switch panel focus         D        Kill (with confirmation)
+?            Help                       q        Quit
+Ctrl+Q       Detach (in attach mode)
+```
+
+## MCP Tools
 
 ### workspace-mcp (24 tools)
 
-Gmail + GitHub 모니터링 및 코드 리뷰 자동화 MCP 서버.
+Gmail + GitHub monitoring and code review automation.
 
-| 카테고리 | 도구 수 | 주요 기능 |
-|----------|---------|----------|
-| Gmail | 5 | 메일 조회, 검색, Jira 티켓 감지, 액션 분류 |
-| GitHub | 7 | 이슈/PR 조회, CI 상태, PR 리뷰 환경 셋업 |
-| Review | 9 | 리뷰 대기/완료 관리, todo 생성, 에이전트 폴링 |
-| Task | 3 | 태스크 목록, 동기화, 상태 갱신 |
+| Category | Tools | Features |
+|----------|-------|----------|
+| Gmail | 5 | Mail listing, search, Jira ticket detection, action classification |
+| GitHub | 7 | Issues/PRs, CI status, PR review environment setup |
+| Review | 9 | Pending/done review management, todo creation, agent polling |
+| Task | 3 | Task list, sync, status updates |
 
 ### token-monitor-mcp (5 tools)
 
-토큰 사용량 추적 및 비용 분석 MCP 서버.
+Token usage tracking and cost analysis.
 
-| 도구 | 기능 |
-|------|------|
-| `token_session_list` | 전체 세션 목록 |
-| `token_session_summary` | 세션별 토큰 상세 |
-| `token_cost_check` | USD 비용 조회 |
-| `token_session_export` | agent-forge 포맷 내보내기 |
-| `token_monitor_version` | 바이너리 버전 |
+| Tool | Purpose |
+|------|---------|
+| `token_session_list` | List all sessions |
+| `token_session_summary` | Per-session token details |
+| `token_cost_check` | USD cost lookup |
+| `token_session_export` | Export in agent-forge format |
+| `token_monitor_version` | Binary version |
 
-## 설치
-
-```bash
-# 대상 프로젝트에 설치 (core skills: 5개)
-./dist/install.sh /path/to/target-project
-
-# 리뷰 스킬 포함 설치 (all skills: 7개)
-./dist/install.sh /path/to/target-project --full
-
-# 전역 설치 (모든 프로젝트에 core skills 적용)
-./dist/install.sh /path/to/target-project --global
-```
-
-설치 후 30/60/90 온보딩 가이드가 출력된다.
-
-## 프로젝트 구조
+## Project Structure
 
 ```
 agent-forge/
-├── dist/                              배포물 (대상 프로젝트 설치용)
-│   ├── install.sh                     설치 스크립트
-│   ├── skills/                        7개 스킬
-│   │   ├── complexity/                복잡도 평가 + 마일스톤 분해
-│   │   ├── qr-gate/                   품질 검증 + 자동 수정 루프
-│   │   ├── delta-log/                 마일스톤 기록
-│   │   ├── milestone/                 완료 워크플로우 (코디네이터)
-│   │   ├── handoff/                   세션 인수인계
-│   │   ├── check-reviews/             리뷰 요청 수집 (병렬)
-│   │   └── do-review/                 코드 리뷰 실행 (sub-agent)
-│   ├── hooks/                         pre-commit QR, session-end checklist
-│   └── templates/                     CLAUDE.md 템플릿
-├── phases/                            방법론 문서 (Phase 1-4)
-│   ├── phase-1-process-model/         QR 규칙, Temporal 규칙, Tier 정의
-│   ├── phase-2-domain-profiles/       스키마, 3개 예시 프로필, 통합 가이드
-│   ├── phase-3-context-management/    델타 로그, 롤링 요약, 병합 규칙
-│   └── phase-4-measurement/           17개 메트릭, 수집 가이드, 분석 플레이북
-├── tools/                             MCP 서버 구현
-│   ├── workspace-mcp/                 Gmail + GitHub + 리뷰 자동화 (Python)
-│   └── token-monitor-mcp/             토큰 모니터링 (Go binary + Python wrapper)
-├── delta-logs/                        프로젝트 마일스톤 기록
-│   ├── M0-baseline.json               초기 상태
-│   ├── M6-handler-wiring.json         최근 마일스톤
-│   └── rolling-summary.md             누적 변경 요약
-├── docs/                              분석 및 설계 문서
-│   ├── ANALYSIS.md                    4개 프로젝트 배경 분석
-│   ├── ARCHITECTURE.md                시스템 아키텍처
-│   ├── ROADMAP.md                     4단계 실행 로드맵
-│   ├── pattern-analysis.md            에이전트 패턴 적용 분석
-│   ├── agent-pattern.md               Google Cloud 에이전트 패턴 정리
-│   └── references/                    참고 연구/논문
-└── CLAUDE.md                          프로젝트 방법론 설정
+├── dist/                              Distributable (install to target projects)
+│   ├── install.sh                     Installation script
+│   ├── skills/                        7 skills
+│   └── hooks/                         Pre-commit QR, session-end checklist
+│
+├── runtime/                           Go module — forge CLI + TUI
+│   ├── cmd/forge/                     CLI entry point (10 command files)
+│   └── internal/
+│       ├── session/                   Session manager + state machine
+│       ├── sandbox/                   Security policies + settings.json generation
+│       ├── terminal/                  tmux-based terminal management
+│       ├── monitor/                   CPU/Mem/Token metrics (gopsutil)
+│       ├── event/                     EventBus (channel-based pub/sub)
+│       ├── daemon/                    Background daemon + worker
+│       ├── config/                    App configuration (~/.forge/)
+│       └── ui/                        BubbleTea TUI + overlay dialogs
+│
+├── phases/                            Methodology documentation (Phase 1-4)
+├── tools/                             MCP server implementations (Python)
+├── delta-logs/                        Project milestone records
+└── docs/                              Design documents
+    ├── PHASE1-CORE-ENGINE.md          Runtime design specification
+    ├── VISION-v2.md                   Full vision (5-layer architecture)
+    ├── ARCHITECTURE.md                v1 methodology architecture
+    └── ROADMAP.md                     Execution roadmap
 ```
 
-## 개발 명령어
+## Development
 
 ```bash
-# workspace-mcp 테스트
-cd tools/workspace-mcp && uv run python -m pytest -q
+# Runtime — build and test
+cd runtime
+go build ./cmd/forge
+go test ./...
+go vet ./...
 
-# token-monitor-mcp 테스트
+# MCP tools — test
+cd tools/workspace-mcp && uv run python -m pytest -q
 cd tools/token-monitor-mcp && uv run python -m pytest -q
 
-# workspace-mcp 서버 실행
+# MCP tools — run server
 cd tools/workspace-mcp && make server
 
-# OAuth 셋업 (최초 1회)
+# OAuth setup (first time)
 cd tools/workspace-mcp && make setup
 ```
 
-## 4단계 로드맵
+## Documentation
 
-```
-Phase 1: 프로세스 모델 ─────── ✅ 완료
-         QR 게이트, Temporal 규칙, 워크플로우 Tier, 컨벤션 계층
-
-Phase 2: 도메인 프로필 ─────── ✅ 완료
-         YAML 스키마, 3개 예시 프로필, 통합 메커니즘
-
-Phase 3: 컨텍스트 관리 ─────── ✅ 완료
-         delta-log 시스템, rolling-summary, 병합 규칙
-
-Phase 4: 측정 파이프라인 ───── 🔧 설계 완료 (데이터 수집 대기)
-         17개 메트릭, 수집 가이드, 분석 플레이북
-```
-
-각 Phase의 상세 내용은 [docs/ROADMAP.md](docs/ROADMAP.md) 참조.
-
-## 배경 연구
-
-이 프로젝트는 다음 오픈소스 프로젝트들의 분석에서 출발했다:
-
-- [claude-config](https://github.com/solatis/claude-config) — 프로세스 엔지니어링 접근 (계획-실행-QR 게이트)
-- [SuperClaude](https://github.com/nickbaumann98/superClaude) — 커맨드 체계 + 에이전트 팜
-- [Everything Claude Code](https://github.com/anthropics/courses) — 넓은 에이전트/스킬 생태계
-- [Aperant](https://github.com/aperant) — 완전 자율 실행
-
-각 프로젝트의 상세 분석: [docs/ANALYSIS.md](docs/ANALYSIS.md)
+| Document | Content |
+|----------|---------|
+| [PHASE1-CORE-ENGINE.md](docs/PHASE1-CORE-ENGINE.md) | Runtime design: package structure, interfaces, state machine, sandbox model |
+| [VISION-v2.md](docs/VISION-v2.md) | Long-term vision: 5-layer architecture, browser metaphor, roadmap |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | v1 methodology architecture |
+| [ROADMAP.md](docs/ROADMAP.md) | Phase 1-4 execution roadmap |
+| [ANALYSIS.md](docs/ANALYSIS.md) | Background research on LLM development approaches |
